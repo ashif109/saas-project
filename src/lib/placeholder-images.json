@@ -1,0 +1,28 @@
+{
+  "placeholderImages": [
+    {
+      "id": "college-1",
+      "description": "Stanford University Campus",
+      "imageUrl": "https://picsum.photos/seed/college1/800/600",
+      "imageHint": "college campus"
+    },
+    {
+      "id": "faculty-1",
+      "description": "Professor John Doe",
+      "imageUrl": "https://picsum.photos/seed/prof1/200/200",
+      "imageHint": "professor person"
+    },
+    {
+      "id": "faculty-2",
+      "description": "Dr. Sarah Smith",
+      "imageUrl": "https://picsum.photos/seed/prof2/200/200",
+      "imageHint": "doctor person"
+    },
+    {
+      "id": "student-1",
+      "description": "Alex Johnson",
+      "imageUrl": "https://picsum.photos/seed/student1/200/200",
+      "imageHint": "student person"
+    }
+  ]
+}
