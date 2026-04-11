@@ -11,7 +11,12 @@ connectDB();
 const app = express();
 
 app.use(cors({
-  origin: "https://saas-project-fcu1yvm4y-ashif109s-projects.vercel.app",
+  origin: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://saas-project-fcu1yvm4y-ashif109s-projects.vercel.app",
+    "https://saas-project-steel.vercel.app"
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
