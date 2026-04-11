@@ -12,7 +12,7 @@ const getBaseURL = () => {
   }
   
   // Production fallback
-  return 'https://saas-project-beum.onrender.com';
+  return 'https://saas-project-1-59yi.onrender.com';
 };
 
 const api = axios.create({

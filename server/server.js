@@ -11,7 +11,7 @@ connectDB();
 const app = express();
 
 app.use(cors({
-  origin: true,
+  origin: "https://saas-project-fcu1yvm4y-ashif109s-projects.vercel.app",
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
