@@ -152,22 +152,45 @@ export default function RegisterCollegeModal({ isOpen, onClose, onSuccess }: Reg
       let url = formData.website.trim();
       if (!url.startsWith('http')) url = `https://${url}`;
       
-      // Use a free favicon/logo service
-      const logoUrl = `https://logo.clearbit.com/${new URL(url).hostname}`;
+      const hostname = new URL(url).hostname.replace('www.', '');
       
-      // Check if logo exists
-      const img = new Image();
-      img.onload = () => {
-        setLogoPreview(logoUrl);
-        setFormData(prev => ({ ...prev, logoUrl }));
-        setFetchingLogo(false);
-        toast({ title: "Logo Found", description: "Successfully fetched logo from website." });
+      // Try multiple logo services in order of quality
+      const logoServices = [
+        `https://logo.clearbit.com/${hostname}`,
+        `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`,
+        `https://api.faviconkit.com/${hostname}/144`
+      ];
+
+      const tryFetch = async (index: number) => {
+        if (index >= logoServices.length) {
+          setFetchingLogo(false);
+          toast({ 
+            variant: "destructive", 
+            title: "Fetch Failed", 
+            description: "Could not find a logo on this website. Please upload manually." 
+          });
+          return;
+        }
+
+        const currentLogoUrl = logoServices[index];
+        const img = new Image();
+        
+        img.onload = () => {
+          setLogoPreview(currentLogoUrl);
+          setFormData(prev => ({ ...prev, logoUrl: currentLogoUrl }));
+          setFetchingLogo(false);
+          toast({ title: "Logo Found", description: `Successfully fetched logo from ${new URL(currentLogoUrl).hostname}.` });
+        };
+
+        img.onerror = () => {
+          // Try next service
+          tryFetch(index + 1);
+        };
+
+        img.src = currentLogoUrl;
       };
-      img.onerror = () => {
-        setFetchingLogo(false);
-        toast({ variant: "destructive", title: "Fetch Failed", description: "Could not find a logo on this website." });
-      };
-      img.src = logoUrl;
+
+      tryFetch(0);
     } catch (err) {
       setFetchingLogo(false);
       toast({ variant: "destructive", title: "Invalid URL", description: "Please enter a valid website address." });

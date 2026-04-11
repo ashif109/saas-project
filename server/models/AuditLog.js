@@ -31,4 +31,10 @@ const auditLogSchema = mongoose.Schema({
   timestamps: true
 });
 
+// Optimized Indexes for log searching
+auditLogSchema.index({ createdAt: -1 });
+auditLogSchema.index({ module: 1 });
+auditLogSchema.index({ severity: 1 });
+auditLogSchema.index({ user: 1 });
+
 module.exports = mongoose.model('AuditLog', auditLogSchema);

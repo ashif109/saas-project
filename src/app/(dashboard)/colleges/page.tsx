@@ -86,6 +86,41 @@ export default function CollegesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const itemsPerPage = 5;
 
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this college? This action cannot be undone.')) {
+      try {
+        await deleteCollege(id);
+        toast({
+          title: "College Deleted",
+          description: "The institutional tenant has been removed successfully.",
+        });
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Delete Failed",
+          description: error.message || "An error occurred while deleting the college.",
+        });
+      }
+    }
+  };
+
+  const handleStatusUpdate = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'Active' ? 'Disabled' : 'Active';
+    try {
+      await updateCollegeStatus(id, newStatus);
+      toast({
+        title: `College ${newStatus}`,
+        description: `The institutional status has been updated to ${newStatus}.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || "An error occurred while updating status.",
+      });
+    }
+  };
+
   React.useEffect(() => {
     fetchColleges();
   }, []);
@@ -198,7 +233,7 @@ export default function CollegesPage() {
               <DropdownMenuItem>Edit Details</DropdownMenuItem>
               <DropdownMenuItem 
                 className={item.status === 'Active' ? 'text-destructive' : 'text-primary'}
-                onClick={() => updateCollegeStatus(item._id, item.status === 'Active' ? 'Disabled' : 'Active')}
+                onClick={() => handleStatusUpdate(item._id, item.status)}
               >
                 {item.status === 'Active' ? 'Disable College' : 'Enable College'}
               </DropdownMenuItem>
@@ -220,16 +255,9 @@ export default function CollegesPage() {
               <DropdownMenuItem>View Logs</DropdownMenuItem>
               <DropdownMenuItem 
                 className="text-destructive focus:bg-destructive/5"
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  if (confirm(`Are you sure you want to delete ${item.name}? This action cannot be undone.`)) {
-                    try {
-                      await deleteCollege(item._id);
-                      toast({ title: 'College Deleted', description: `${item.name} has been removed.` });
-                    } catch (e: any) {
-                      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
-                    }
-                  }
+                  handleDelete(item._id);
                 }}
               >
                 Delete College

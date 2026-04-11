@@ -163,7 +163,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to update status', loading: false });
+          const message = error.response?.data?.message || 'Failed to update status';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 
@@ -211,7 +213,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to extend subscription', loading: false });
+          const message = error.response?.data?.message || 'Failed to extend subscription';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 
@@ -224,7 +228,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to change plan', loading: false });
+          const message = error.response?.data?.message || 'Failed to change plan';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 
@@ -237,7 +243,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to cancel subscription', loading: false });
+          const message = error.response?.data?.message || 'Failed to cancel subscription';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 
@@ -250,7 +258,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to reactivate subscription', loading: false });
+          const message = error.response?.data?.message || 'Failed to reactivate subscription';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 
@@ -263,7 +273,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to update payment status', loading: false });
+          const message = error.response?.data?.message || 'Failed to update payment status';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 
@@ -276,7 +288,9 @@ export const useCollegeStore = create<CollegeState>()(
             loading: false
           }));
         } catch (error: any) {
-          set({ error: error.response?.data?.message || 'Failed to update config', loading: false });
+          const message = error.response?.data?.message || 'Failed to update config';
+          set({ error: message, loading: false });
+          throw new Error(message);
         }
       },
 

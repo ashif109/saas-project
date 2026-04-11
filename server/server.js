@@ -11,9 +11,7 @@ connectDB();
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  origin: true,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -23,12 +21,18 @@ app.get('/', (req, res) => {
   res.send('Pulse API is running...');
 });
 
+// Root API route
+app.get('/api', (req, res) => {
+  res.json({ message: 'Pulse API V1 is online and ready.', status: 'Healthy' });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/colleges', require('./routes/collegeRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/logs', require('./routes/logRoutes'));
+app.use('/api/system', require('./routes/systemRoutes'));
 
 // Error Middleware
 app.use(notFound);

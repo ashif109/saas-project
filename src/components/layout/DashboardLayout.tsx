@@ -187,6 +187,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setMounted(true);
     if (!isAuthenticated) {
       router.push('/login');
+      return;
     }
     if (!settings) {
       fetchSettings();

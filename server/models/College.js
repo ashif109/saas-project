@@ -80,4 +80,9 @@ const collegeSchema = mongoose.Schema({
   timestamps: true
 });
 
+// Optimized Indexes for performance
+collegeSchema.index({ status: 1 });
+collegeSchema.index({ 'subscription.status': 1 });
+collegeSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('College', collegeSchema);

@@ -35,16 +35,19 @@ interface SettingsState {
   updateSettings: (newSettings: Partial<SystemSettings>) => Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: null,
   loading: false,
   fetchSettings: async () => {
+    if (get().loading || get().settings) return;
+    
     set({ loading: true });
     try {
       const { data } = await api.get('/api/settings/system');
       set({ settings: data });
-    } catch (error) {
-      console.error('Error fetching settings:', error);
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Error fetching settings';
+      console.error(message, error);
     } finally {
       set({ loading: false });
     }
@@ -53,9 +56,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     try {
       const { data } = await api.put('/api/settings/system', newSettings);
       set({ settings: data });
-    } catch (error) {
-      console.error('Error updating settings:', error);
-      throw error;
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Error updating settings';
+      console.error(message, error);
+      throw new Error(message);
     }
   },
 }));

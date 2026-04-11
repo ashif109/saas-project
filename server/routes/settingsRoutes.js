@@ -5,7 +5,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 // System settings routes
 router.route('/system')
-  .get(protect, authorize('SUPER_ADMIN'), getSystemSettings)
+  .get(protect, getSystemSettings)
   .put(protect, authorize('SUPER_ADMIN'), updateSystemSettings);
 
 module.exports = router;

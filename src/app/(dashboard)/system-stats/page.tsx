@@ -126,13 +126,24 @@ export default function SystemStatsPage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchStats();
-    await fetchColleges();
-    setIsRefreshing(false);
-    toast({
-      title: "Data Refreshed",
-      description: "Platform analytics have been synchronized with the latest logs.",
-    });
+    try {
+      await api.post('/api/system/sync-data');
+      await fetchStats();
+      await fetchColleges();
+      toast({
+        title: "Data Refreshed",
+        description: "Platform analytics have been synchronized with the latest logs.",
+      });
+    } catch (error) {
+      console.error('Error syncing data:', error);
+      toast({
+        variant: "destructive",
+        title: "Refresh Failed",
+        description: "Could not synchronize platform data at this time.",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   if ((collegesLoading || loadingStats) && colleges.length === 0) {
@@ -147,34 +158,65 @@ export default function SystemStatsPage() {
 
   const handleClearCache = async () => {
     setIsClearing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsClearing(false);
-    toast({
-      title: "Temporary Data Cleared",
-      description: "Local simulation cache has been successfully reset.",
-    });
+    try {
+      const { data } = await api.post('/api/system/clear-temp-data');
+      toast({
+        title: "Temporary Data Cleared",
+        description: data.message || "Historical system logs have been successfully pruned.",
+      });
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      toast({
+        variant: "destructive",
+        title: "Cleanup Failed",
+        description: "An error occurred while clearing temporary data.",
+      });
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const handleRecalculate = async () => {
     setIsRecalculating(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsRecalculating(false);
-    toast({
-      title: "Analytics Recalculated",
-      description: "Institutional performance metrics have been re-aggregated.",
-    });
+    try {
+      await api.post('/api/system/recalculate-analytics');
+      await fetchStats();
+      toast({
+        title: "Analytics Recalculated",
+        description: "Institutional performance metrics have been re-aggregated.",
+      });
+    } catch (error) {
+      console.error('Error recalculating stats:', error);
+      toast({
+        variant: "destructive",
+        title: "Calculation Failed",
+        description: "Could not re-aggregate institutional metrics.",
+      });
+    } finally {
+      setIsRecalculating(false);
+    }
   };
 
   const handleRestart = async () => {
-    toast({
-      title: "System Restart Initiated",
-      description: "The platform is performing a mock graceful restart.",
-    });
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    toast({
-      title: "System Online",
-      description: "All services have been restored successfully.",
-    });
+    try {
+      await api.post('/api/system/restart');
+      toast({
+        title: "System Restart Initiated",
+        description: "Platform is performing a graceful restart. Reconnecting shortly...",
+      });
+      
+      // Simulate disconnection effect on UI
+      setTimeout(() => {
+        window.location.reload();
+      }, 5000);
+    } catch (error) {
+      console.error('Error restarting platform:', error);
+      toast({
+        variant: "destructive",
+        title: "Restart Failed",
+        description: "Could not initiate system restart. Check server logs.",
+      });
+    }
   };
 
   const rankingColumns = [
