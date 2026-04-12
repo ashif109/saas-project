@@ -26,11 +26,15 @@ const getTransporter = (overridePort = null, overrideSecure = null) => {
     auth: { user, pass },
     pool: true,
     maxConnections: 3,
-    connectionTimeout: 10000, // 10s for each attempt
-    greetingTimeout: 10000,
+    maxMessages: 100,
+    connectionTimeout: 30000, // Very patient: 30s
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
     tls: {
+      // These settings are critical for custom mail servers like Optimaxin
       rejectUnauthorized: false,
-      minVersion: 'TLSv1.2'
+      minVersion: 'TLSv1', // Allow older TLS if necessary
+      ciphers: 'SSLv3'     // Broaden cipher support
     }
   });
 };
