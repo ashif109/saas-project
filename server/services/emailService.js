@@ -7,11 +7,19 @@ const getTransporter = () => {
   const pass = process.env.SMTP_PASS;
   const secure = port === 465;
 
+  if (!host || !user || !pass) {
+    console.warn('Email Service: Missing SMTP configuration (HOST, USER, or PASS). Emails will fail to send.');
+  }
+
   return nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    tls: {
+      // Do not fail on invalid certs
+      rejectUnauthorized: false
+    }
   });
 };
 

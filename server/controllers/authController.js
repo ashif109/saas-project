@@ -201,12 +201,12 @@ const forgotPassword = asyncHandler(async (req, res) => {
   console.log('Sending password reset OTP to:', email);
   try {
     await sendPasswordResetOtp(user.email, otp);
-    console.log('Password reset OTP sent successfully');
+    console.log('Password reset OTP sent successfully to:', user.email);
     await createLog({
       user: user._id,
       userName: user.name,
       userEmail: user.email,
-      action: 'Password Reset OTP Sent',
+      action: 'Forgot Password Request',
       module: 'Auth',
       details: `OTP sent to ${user.email}`,
       severity: 'Info',
@@ -215,15 +215,20 @@ const forgotPassword = asyncHandler(async (req, res) => {
     });
     res.json({ message: 'OTP sent to email' });
   } catch (emailError) {
-    console.error('Error sending password reset OTP:', emailError);
+    console.error('CRITICAL: Email Sending Failed (SMTP Error):', {
+      message: emailError.message,
+      stack: emailError.stack,
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      user: process.env.SMTP_USER
+    });
+    
     user.resetPasswordOTP = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
-    // In production, we might still want to return 200 to avoid email enumeration,
-    // but since the OTP isn't sent, the user can't proceed.
-    // For now, let's return a 500 so we know it failed.
+    
     res.status(500);
-    throw new Error('Error sending password reset email. Please try again later.');
+    throw new Error(`Email service failed: ${emailError.message}. Check SMTP configuration.`);
   }
 });
 
