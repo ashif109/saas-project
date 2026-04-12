@@ -198,8 +198,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
   user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
   await user.save();
 
+  console.log('Sending password reset OTP to:', email);
   try {
     await sendPasswordResetOtp(user.email, otp);
+    console.log('Password reset OTP sent successfully');
     await createLog({
       user: user._id,
       userName: user.name,
@@ -212,12 +214,16 @@ const forgotPassword = asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent']
     });
     res.json({ message: 'OTP sent to email' });
-  } catch (error) {
+  } catch (emailError) {
+    console.error('Error sending password reset OTP:', emailError);
     user.resetPasswordOTP = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
+    // In production, we might still want to return 200 to avoid email enumeration,
+    // but since the OTP isn't sent, the user can't proceed.
+    // For now, let's return a 500 so we know it failed.
     res.status(500);
-    throw new Error('Email could not be sent');
+    throw new Error('Error sending password reset email. Please try again later.');
   }
 });
 

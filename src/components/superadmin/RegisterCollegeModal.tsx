@@ -405,9 +405,9 @@ Generated On: ${new Date().toLocaleString()}
                   <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                     <School className="h-6 w-6" />
                   </div>
-                  <DialogTitle className="text-2xl font-black tracking-tight">Register New College</DialogTitle>
+                  <DialogTitle className="text-2xl md:text-3xl font-black tracking-tight">Register New College</DialogTitle>
                 </div>
-                <DialogDescription className="text-sm font-medium">Follow the multi-step process to set up a new institutional tenant.</DialogDescription>
+                <DialogDescription className="text-sm md:text-base font-medium text-muted-foreground">Follow the multi-step process to set up a new institutional tenant.</DialogDescription>
               </DialogHeader>
 
               {renderStepIndicator()}
