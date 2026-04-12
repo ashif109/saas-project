@@ -130,24 +130,7 @@ Please use your registered administrator credentials to log in.
   try {
     return await getTransporter().sendMail(mailOptions);
   } catch (error) {
-    const isPort465 = process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465;
-    
-    if (isPort465) {
-      console.warn('Port 465 failed, attempting automatic fallback to Port 587...');
-      try {
-        return await getTransporter(587, false).sendMail(mailOptions);
-      } catch (err587) {
-        console.warn('Port 587 also failed, attempting final fallback to Port 2525...');
-        try {
-          return await getTransporter(2525, false).sendMail(mailOptions);
-        } catch (err2525) {
-          console.error('All standard SMTP ports failed.', err2525);
-          console.log(`[FALLBACK] Welcome email to ${to} (Creds: Password=${password}) aborted, but returning success.`);
-          return { mocked: true };
-        }
-      }
-    }
-    console.error('SMTP sending failed.', error);
+    console.error('SMTP sending failed on Port ' + process.env.SMTP_PORT, error);
     console.log(`[FALLBACK] Welcome email to ${to} (Creds: Password=${password}) aborted, but returning success.`);
     return { mocked: true };
   }
@@ -207,24 +190,7 @@ const sendPasswordResetOtp = async (to, otp) => {
   try {
     return await getTransporter().sendMail(mailOptions);
   } catch (error) {
-    const isPort465 = process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465;
-    
-    if (isPort465) {
-      console.warn('Port 465 failed, attempting automatic fallback to Port 587...');
-      try {
-        return await getTransporter(587, false).sendMail(mailOptions);
-      } catch (err587) {
-        console.warn('Port 587 also failed, attempting final fallback to Port 2525...');
-        try {
-          return await getTransporter(2525, false).sendMail(mailOptions);
-        } catch (err2525) {
-          console.error('All standard SMTP ports log timeout.', err2525);
-          console.log(`[FALLBACK] Password reset to ${to} (OTP: ${otp}) aborted, returning success.`);
-          return { mocked: true };
-        }
-      }
-    }
-    console.error('SMTP sending failed.', error);
+    console.error('SMTP sending failed on Port ' + process.env.SMTP_PORT, error);
     console.log(`[FALLBACK] Password reset to ${to} (OTP: ${otp}) aborted, returning success.`);
     return { mocked: true };
   }
