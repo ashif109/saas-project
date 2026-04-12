@@ -226,37 +226,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="space-y-6">
-            <div className="relative flex items-center py-2">
-              <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink mx-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Onboarding</span>
-              <div className="flex-grow border-t border-slate-200"></div>
-            </div>
-
-            <div className="text-center">
-              <p className="text-sm text-slate-500 font-medium">
-                New institution?{' '}
-                <Link href="/signup" className="text-primary font-bold hover:underline underline-offset-4 decoration-2">
-                  Register your college
-                </Link>
-              </p>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 flex items-center justify-between gap-4 group cursor-help transition-all hover:border-primary/20 hover:bg-primary/[0.02]">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">Quick Access</p>
-                  <p className="text-xs font-bold text-slate-700">Use 'super@admin.com' for platform root access.</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-            </div>
-          </div>
-
-          <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-10">
             &copy; {new Date().getFullYear()} PulseDesk SaaS Ecosystem. All rights reserved.
           </p>
         </div>
