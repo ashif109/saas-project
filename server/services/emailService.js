@@ -119,9 +119,16 @@ Please use your registered administrator credentials to log in.
   try {
     return await getTransporter().sendMail(mailOptions);
   } catch (error) {
-    if (process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465) {
+    const isPort465 = process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465;
+    
+    if (isPort465) {
       console.warn('Port 465 failed, attempting automatic fallback to Port 587...');
-      return await getTransporter(587, false).sendMail(mailOptions);
+      try {
+        return await getTransporter(587, false).sendMail(mailOptions);
+      } catch (err587) {
+        console.warn('Port 587 also failed, attempting final fallback to Port 2525...');
+        return await getTransporter(2525, false).sendMail(mailOptions);
+      }
     }
     throw error;
   }
@@ -181,10 +188,22 @@ const sendPasswordResetOtp = async (to, otp) => {
   try {
     return await getTransporter().sendMail(mailOptions);
   } catch (error) {
-    // If Port 465 fails (common on cloud), try Port 587 automatically
-    if (process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465) {
+    // If Port 465 fails (common on cloud), try other common ports automatically
+    const isPort465 = process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465;
+    
+    if (isPort465) {
       console.warn('Port 465 failed, attempting automatic fallback to Port 587...');
-      return await getTransporter(587, false).sendMail(mailOptions);
+      try {
+        return await getTransporter(587, false).sendMail(mailOptions);
+      } catch (err587) {
+        console.warn('Port 587 also failed, attempting final fallback to Port 2525...');
+        try {
+          return await getTransporter(2525, false).sendMail(mailOptions);
+        } catch (err2525) {
+          console.error('All standard SMTP ports (465, 587, 2525) timed out.');
+          throw error; // Throw original error
+        }
+      }
     }
     throw error;
   }
