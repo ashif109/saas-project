@@ -5,21 +5,33 @@ const getTransporter = () => {
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const secure = port === 465;
+  
+  // Use SMTP_SECURE if provided, otherwise default to true for 465
+  const secure = process.env.SMTP_SECURE !== undefined 
+    ? process.env.SMTP_SECURE === 'true' 
+    : port === 465;
 
   if (!host || !user || !pass) {
     console.warn('Email Service: Missing SMTP configuration (HOST, USER, or PASS). Emails will fail to send.');
   }
+
+  console.log(`Email Service: Attempting connection to ${host}:${port} (Secure: ${secure})`);
 
   return nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    connectionTimeout: 15000, // 15 seconds timeout
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
     tls: {
       // Do not fail on invalid certs
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+      minVersion: 'TLSv1.2'
+    },
+    logger: true, // Log to console
+    debug: true   // Include SMTP traffic in logs
   });
 };
 
