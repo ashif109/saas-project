@@ -1,15 +1,17 @@
 const nodemailer = require('nodemailer');
 
-const getTransporter = () => {
+const getTransporter = (overridePort = null, overrideSecure = null) => {
   const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
+  const port = overridePort || Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   
   // Use SMTP_SECURE if provided, otherwise default to true for 465
-  const secure = process.env.SMTP_SECURE !== undefined 
-    ? process.env.SMTP_SECURE === 'true' 
-    : port === 465;
+  const secure = overrideSecure !== null 
+    ? overrideSecure 
+    : (process.env.SMTP_SECURE !== undefined 
+        ? process.env.SMTP_SECURE === 'true' 
+        : port === 465);
 
   if (!host || !user || !pass) {
     console.warn('Email Service: Missing SMTP configuration (HOST, USER, or PASS). Emails will fail to send.');
@@ -22,12 +24,10 @@ const getTransporter = () => {
     port,
     secure,
     auth: { user, pass },
-    pool: true, // Use connection pooling
-    maxConnections: 5,
-    maxMessages: 100,
-    connectionTimeout: 20000, // Increased to 20s
-    greetingTimeout: 20000,
-    socketTimeout: 30000,
+    pool: true,
+    maxConnections: 3,
+    connectionTimeout: 10000, // 10s for each attempt
+    greetingTimeout: 10000,
     tls: {
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2'
@@ -88,7 +88,6 @@ const buildWelcomeHtml = (collegeName, loginUrl, adminEmail, password, showCrede
 };
 
 const sendWelcomeEmail = async (to, password, collegeName, showCredentials = true) => {
-  const transporter = getTransporter();
   const from = process.env.SMTP_FROM || 'Pulse <no-reply@pulse.com>';
   const loginUrl = process.env.FRONTEND_LOGIN_URL || 'https://app.pulsedesk.com/login';
 
@@ -117,7 +116,15 @@ Please use your registered administrator credentials to log in.
     ],
   };
 
-  return transporter.sendMail(mailOptions);
+  try {
+    return await getTransporter().sendMail(mailOptions);
+  } catch (error) {
+    if (process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465) {
+      console.warn('Port 465 failed, attempting automatic fallback to Port 587...');
+      return await getTransporter(587, false).sendMail(mailOptions);
+    }
+    throw error;
+  }
 };
 
 const buildOtpHtml = (otp) => {
@@ -162,7 +169,6 @@ const buildOtpHtml = (otp) => {
 };
 
 const sendPasswordResetOtp = async (to, otp) => {
-  const transporter = getTransporter();
   const from = process.env.SMTP_FROM || 'Pulse <no-reply@pulse.com>';
 
   const mailOptions = {
@@ -172,7 +178,16 @@ const sendPasswordResetOtp = async (to, otp) => {
     html: buildOtpHtml(otp),
   };
 
-  return transporter.sendMail(mailOptions);
+  try {
+    return await getTransporter().sendMail(mailOptions);
+  } catch (error) {
+    // If Port 465 fails (common on cloud), try Port 587 automatically
+    if (process.env.SMTP_PORT === '465' || Number(process.env.SMTP_PORT) === 465) {
+      console.warn('Port 465 failed, attempting automatic fallback to Port 587...');
+      return await getTransporter(587, false).sendMail(mailOptions);
+    }
+    throw error;
+  }
 };
 
 module.exports = {
