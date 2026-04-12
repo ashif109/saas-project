@@ -22,16 +22,16 @@ const getTransporter = () => {
     port,
     secure,
     auth: { user, pass },
-    connectionTimeout: 15000, // 15 seconds timeout
-    greetingTimeout: 15000,
+    pool: true, // Use connection pooling
+    maxConnections: 5,
+    maxMessages: 100,
+    connectionTimeout: 20000, // Increased to 20s
+    greetingTimeout: 20000,
     socketTimeout: 30000,
     tls: {
-      // Do not fail on invalid certs
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2'
-    },
-    logger: true, // Log to console
-    debug: true   // Include SMTP traffic in logs
+    }
   });
 };
 
