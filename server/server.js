@@ -7,8 +7,8 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 // Load environment variables
 dotenv.config();
 
-// Connect to Database
-connectDB();
+// DO NOT connect synchronously here. This allows Express to attach route handlers immediately.
+// We will connect via a middleware right before the routing layer.
 
 const app = express();
 
@@ -44,6 +44,13 @@ app.use(cors({
 // --- Middleware ---
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// --- Serverless DB Connection Middleware ---
+// Ensures Vercel waits for DB connection before hitting API routes, avoiding 'buffering timed out'
+app.use(async (req, res, next) => {
+    await connectDB();
+    next();
+});
 
 // --- Basic Routes ---
 app.get('/', (req, res) => {
