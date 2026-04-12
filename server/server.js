@@ -16,7 +16,9 @@ const app = express();
 const allowedOrigins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://saas-project-steel.vercel.app"
+    "https://saas-project-steel.vercel.app",
+    "https://saas-project-fcu1yvm4y-ashif109s-projects.vercel.app",
+    "https://saas-project-git-main-ashif109s-projects.vercel.app"
 ];
 
 app.use(cors({
@@ -24,12 +26,13 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
 
-        const isAllowedHost = allowedOrigins.includes(origin);
+        const isAllowedHost = allowedOrigins.includes(origin) || allowedOrigins.includes(origin + "/");
         const isVercelPreview = origin.endsWith(".vercel.app");
 
         if (isAllowedHost || isVercelPreview) {
             callback(null, true);
         } else {
+            console.warn(`Blocked by CORS: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -67,8 +70,4 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
