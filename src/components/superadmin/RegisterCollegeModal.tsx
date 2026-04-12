@@ -59,6 +59,32 @@ export default function RegisterCollegeModal({ isOpen, onClose, onSuccess }: Reg
   useEffect(() => {
     if (isOpen) {
       fetchColleges();
+      // Reset form on open
+      setFormData({
+        name: '',
+        code: '',
+        email: '',
+        phone: '',
+        website: '',
+        logoUrl: '',
+        address: '',
+        city: '',
+        state: '',
+        country: 'India',
+        adminName: '',
+        adminEmail: '',
+        adminPassword: generatePassword(),
+        subscription: 'Basic',
+        status: 'Active',
+        features: {
+          doubtSystem: true,
+          attendance: true,
+          analytics: true
+        }
+      });
+      setStep(1);
+      setSuccessData(null);
+      setErrors({});
     }
   }, [isOpen, fetchColleges]);
 
@@ -108,16 +134,14 @@ export default function RegisterCollegeModal({ isOpen, onClose, onSuccess }: Reg
     return retVal;
   };
 
-  // Initial password generation
+  // Initial password generation - handled in isOpen effect
   useEffect(() => {
-    if (isOpen && !formData.adminPassword) {
-      setFormData(prev => ({ ...prev, adminPassword: generatePassword() }));
-    }
+    // This effect is now redundant as generatePassword is called in the isOpen effect
   }, [isOpen]);
 
   // Smart Email Auto-generation
   useEffect(() => {
-    if (formData.code) {
+    if (formData.code && !formData.adminEmail) {
       const generatedEmail = `admin@${formData.code.toLowerCase().replace(/\s+/g, '')}.pulse.com`;
       setFormData(prev => ({ ...prev, adminEmail: generatedEmail }));
     }

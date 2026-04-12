@@ -423,8 +423,8 @@ module.exports = {
     // Check for duplicate college by name (case-insensitive) or code
     const existing = await College.findOne({ 
       $or: [
-        { name: { $regex: new RegExp(`^${name}$`, 'i') } }, 
-        { code: code.toUpperCase() }
+        { name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } }, 
+        { code: code.trim().toUpperCase() }
       ] 
     });
     
@@ -436,28 +436,28 @@ module.exports = {
         inputCode: code
       });
       res.status(409);
-      const conflictField = existing.code === code.toUpperCase() ? 'code' : 'name';
+      const conflictField = existing.code === code.trim().toUpperCase() ? 'code' : 'name';
       throw new Error(`College already exists with this ${conflictField}: ${conflictField === 'code' ? existing.code : existing.name}`);
     }
 
     // Check for duplicate user by email
-    const existingUser = await User.findOne({ email: adminEmail.toLowerCase() });
+    const existingUser = await User.findOne({ email: adminEmail.trim().toLowerCase() });
     if (existingUser) {
       console.log('User collision detected:', adminEmail);
       res.status(409);
-      throw new Error(`User with email ${adminEmail} already exists`);
+      throw new Error(`User with email ${adminEmail.trim()} already exists`);
     }
 
     const college = await College.create({
-      name,
-      code,
-      email,
-      phone,
-      website,
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      email: email.trim().toLowerCase(),
+      phone: phone?.trim(),
+      website: website?.trim(),
       logoUrl,
-      address,
-      city,
-      state,
+      address: address?.trim(),
+      city: city?.trim(),
+      state: state?.trim(),
       country: country || 'India',
       status: req.body.status || 'Active',
       subscription: {
@@ -469,8 +469,8 @@ module.exports = {
     });
 
     const adminUser = await User.create({
-      name: adminName || 'College Admin',
-      email: adminEmail.toLowerCase(),
+      name: adminName?.trim() || 'College Admin',
+      email: adminEmail.trim().toLowerCase(),
       password: adminPassword,
       role: 'COLLEGE_ADMIN',
       college: college._id,
