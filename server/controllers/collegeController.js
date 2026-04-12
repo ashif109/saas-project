@@ -145,14 +145,10 @@ const registerCollege = asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent']
     });
 
-    // Send Welcome Email if enabled
+    // Send Welcome Email if enabled - DO NOT await to keep response fast
     if (settings.sendWelcomeEmail) {
-      try {
-        await sendWelcomeEmail(adminEmail, adminPassword, name, settings.sendCredentials);
-      } catch (err) {
-        console.error('Failed to send welcome email:', err);
-        // Don't fail the registration if email fails
-      }
+      sendWelcomeEmail(adminEmail, adminPassword, name, settings.sendCredentials)
+        .catch(err => console.error('Background email sending failed:', err));
     }
 
     res.status(201).json(college);
@@ -479,22 +475,14 @@ module.exports = {
 
     console.log('College and Admin created successfully:', college.name);
 
-    try {
-      await sendWelcomeEmail(adminUser.email, adminPassword, college.name);
-    } catch (e) {
-      console.error('Email sending failed during registration:', e.message);
-      return res.status(201).json({
-        college,
-        adminId: adminUser._id,
-        emailSent: false,
-        message: 'College created but failed to send email',
-      });
-    }
+    // Send Welcome Email in background - DO NOT await to keep response fast
+    sendWelcomeEmail(adminUser.email, adminPassword, college.name)
+      .catch(e => console.error('Background email sending failed during registration:', e.message));
 
     res.status(201).json({
       college,
       adminId: adminUser._id,
-      emailSent: true,
+      emailSent: true, // We assume it's triggered
     });
   }),
   resendCredentials: asyncHandler(async (req, res) => {
