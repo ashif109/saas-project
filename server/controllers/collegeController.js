@@ -145,10 +145,13 @@ const registerCollege = asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent']
     });
 
-    // Send Welcome Email if enabled - DO NOT await to keep response fast
+    // Send Welcome Email if enabled - await is REQUIRED on Serverless (Vercel)
     if (settings.sendWelcomeEmail) {
-      sendWelcomeEmail(adminEmail, adminPassword, name, settings.sendCredentials)
-        .catch(err => console.error('Background email sending failed:', err));
+      try {
+        await sendWelcomeEmail(adminEmail, adminPassword, name, settings.sendCredentials);
+      } catch (err) {
+        console.error('Email sending failed:', err);
+      }
     }
 
     res.status(201).json(college);
@@ -475,9 +478,12 @@ module.exports = {
 
     console.log('College and Admin created successfully:', college.name);
 
-    // Send Welcome Email in background - DO NOT await to keep response fast
-    sendWelcomeEmail(adminUser.email, adminPassword, college.name)
-      .catch(e => console.error('Background email sending failed during registration:', e.message));
+    // Send Welcome Email - await is REQUIRED on Serverless (Vercel)
+    try {
+      await sendWelcomeEmail(adminUser.email, adminPassword, college.name);
+    } catch (e) {
+      console.error('Email sending failed during registration:', e.message);
+    }
 
     res.status(201).json({
       college,

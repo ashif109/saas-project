@@ -139,7 +139,12 @@ export const useCollegeStore = create<CollegeState>()(
         set({ loading: true, error: null });
         try {
           const { data } = await api.post('/api/colleges/create', collegeData);
-          const newCollege = { ...data.college, id: data.college._id };
+          const newCollege = { 
+            ...data.college, 
+            id: data.college._id,
+            adminEmail: collegeData.adminEmail,
+            adminPassword: collegeData.adminPassword
+          };
           
           set(state => ({
             colleges: [newCollege, ...state.colleges],
