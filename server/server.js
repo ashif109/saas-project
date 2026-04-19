@@ -68,6 +68,7 @@ app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/logs', require('./routes/logRoutes'));
 app.use('/api/system', require('./routes/systemRoutes'));
+app.use('/api/roles', require('./routes/roleRoutes'));
 
 // --- Error Handling Middleware ---
 app.use(notFound);
@@ -76,8 +77,17 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 if (process.env.VERCEL !== '1') {
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
         console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+        // Immediately trigger connection instead of waiting for API hit
+        await connectDB();
+        try {
+            const prisma = require('./config/prisma');
+            await prisma.$connect();
+            console.log('Prisma Engine Connected Successfully!');
+        } catch (error) {
+            console.error('Prisma Connection Error:', error.message);
+        }
     });
 }
 

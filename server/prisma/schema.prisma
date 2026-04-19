@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// --- Auth & Users & Roles System ---
+
+model User {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  email          String    @unique
+  password       String
+  firstName      String
+  lastName       String
+  phone          String?
+  isActive       Boolean   @default(true)
+  
+  // To handle multi-tenant isolation
+  collegeId      String?   @db.ObjectId
+  college        College?  @relation("CollegeUsers", fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  
+  userRoles      UserRole[]
+
+  // References to Personas (Optional depending on roles)
+  studentProfile StudentProfile?
+  facultyProfile FacultyProfile?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Role {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   // "Faculty", "HOD", "Director", "Admin Staff"
+  description String?
+  
+  permissions String[] // e.g. ["CREATE_USER", "VIEW_DEPT", "ALL"]
+  
+  collegeId   String   @db.ObjectId
+  college     College  @relation("CollegeRoles", fields: [collegeId], references: [id], onDelete: Cascade)
+
+  userRoles   UserRole[]
+
+  isGlobal    Boolean  @default(false) // If true, applies across college. If false, might be scoped to department.
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserRole {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String    @db.ObjectId
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  roleId         String    @db.ObjectId
+  role           Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  isPrimary      Boolean   @default(false)
+  departmentId   String?   @db.ObjectId // Optional scope
+  department     Department? @relation(fields: [departmentId], references: [id])
+
+  validFrom      DateTime?
+  validUntil     DateTime? // Time-bound role
+
+  // Overridden permissions for this specific assignment
+  extraPermissions String[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// --- Core Modules ---
+
+model College {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  subdomain       String   @unique
+  address         String?
+  logoUrl         String?
+  
+  users           User[]   @relation("CollegeUsers")
+  roles           Role[]   @relation("CollegeRoles")
+  departments     Department[]
+  academicYears   AcademicYear[]
+  batches         Batch[]
+  notices         Notice[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Department {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   // e.g. "Computer Science"
+  code        String   // e.g. "CSE"
+  
+  collegeId   String   @db.ObjectId
+  college     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  courses     Course[]
+  faculties   FacultyProfile[]
+  userRoles   UserRole[] // To link roles like HOD to this department
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Course {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String   // e.g. "B.Tech Computer Science"
+  duration     Int      // in years or semesters
+  
+  departmentId String   @db.ObjectId
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  subjects     Subject[]
+  batches      Batch[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Subject {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  code        String
+  credits     Int
+  
+  courseId    String   @db.ObjectId
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  semester    Int // Which semester it belongs to
+
+  facultyAssignments FacultySubject[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AcademicYear {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   // e.g. "2023-2024"
+  startDate   DateTime
+  endDate     DateTime
+  
+  collegeId   String   @db.ObjectId
+  college     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  batches     Batch[]
+  events      Event[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Batch {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  name           String   // e.g. "2023 Batch"
+  
+  courseId       String   @db.ObjectId
+  course         Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  academicYearId String   @db.ObjectId
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  
+  collegeId      String   @db.ObjectId
+  college        College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  students       StudentProfile[]
+  timetables     TimetableEntry[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model StudentProfile {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  enrollmentNo   String   @unique
+  admissionDate  DateTime
+  
+  userId         String   @unique @db.ObjectId
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  batchId        String   @db.ObjectId
+  batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model FacultyProfile {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId     String   @unique
+  joiningDate    DateTime
+  
+  userId         String   @unique @db.ObjectId
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  departmentId   String   @db.ObjectId
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  subjects       FacultySubject[]
+  timetables     TimetableEntry[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model FacultySubject {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  facultyId   String   @db.ObjectId
+  faculty     FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  subjectId   String   @db.ObjectId
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([facultyId, subjectId])
+}
+
+model TimetableEntry {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  dayOfWeek      String   // "Monday", "Tuesday"
+  startTime      String   // "09:00"
+  endTime        String   // "10:00"
+  roomInfo       String?
+  
+  batchId        String   @db.ObjectId
+  batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  facultyId      String   @db.ObjectId
+  faculty        FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Notice {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
+  
+  collegeId   String   @db.ObjectId
+  college     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  targetRoles String[] // Empty means all
+  targetDepts String[] // Empty means all
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Event {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime
+  isHoliday      Boolean  @default(false)
+  
+  academicYearId String   @db.ObjectId
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
