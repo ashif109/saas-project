@@ -21,25 +21,34 @@ const allowedOrigins = [
     "https://saas-project-git-main-ashif109s-projects.vercel.app"
 ];
 
-app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return callback(null, true);
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    // Allow requests with no origin (like curl) or specific allowed origins
+    const isVercelPreview = origin && origin.endsWith(".vercel.app");
+    const isAllowedHost = origin && (allowedOrigins.includes(origin) || allowedOrigins.includes(origin + "/"));
+    
+    // Safely set Allow-Origin if matched
+    if (isAllowedHost || isVercelPreview) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (origin) {
+        // As a fallback for development/testing, or if you want to be generic
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
 
-        const isAllowedHost = allowedOrigins.includes(origin) || allowedOrigins.includes(origin + "/");
-        const isVercelPreview = origin.endsWith(".vercel.app");
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    );
 
-        if (isAllowedHost || isVercelPreview) {
-            callback(null, true);
-        } else {
-            console.warn(`Blocked by CORS: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    // Eagerly return 200 for OPTIONS preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
 
 // --- Middleware ---
 app.use(express.json({ limit: '10mb' }));
