@@ -59,8 +59,13 @@ exports.enrollStudent = async (req, res) => {
     // If not, we will rely on a collegeId passed or fallback to first college for dev testing
     let collegeId = req.user?.collegeId;
     if (!collegeId) {
-      const firstCollege = await prisma.college.findFirst();
-      if (!firstCollege) return res.status(400).json({ message: "No college found in DB."});
+      let firstCollege = await prisma.college.findFirst();
+      if (!firstCollege) {
+        // Auto-seed for fresh production deployment
+        firstCollege = await prisma.college.create({
+          data: { name: "PulseDesk Default", code: "PDC", email: "admin@pulsedesk.com", address: "Cloud", phone: "123" }
+        });
+      }
       collegeId = firstCollege.id;
     }
 
@@ -123,8 +128,12 @@ exports.getStudents = async (req, res) => {
   try {
     let collegeId = req.user?.collegeId;
     if (!collegeId) {
-      const firstCollege = await prisma.college.findFirst();
-      if (!firstCollege) return res.status(200).json([]);
+      let firstCollege = await prisma.college.findFirst();
+      if (!firstCollege) {
+        firstCollege = await prisma.college.create({
+          data: { name: "PulseDesk Default", code: "PDC", email: "admin@pulsedesk.com", address: "Cloud", phone: "123" }
+        });
+      }
       collegeId = firstCollege.id;
     }
 
