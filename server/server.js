@@ -51,6 +51,7 @@ app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/logs', require('./routes/logRoutes'));
 app.use('/api/system', require('./routes/systemRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/students', require('./routes/studentRoutes'));
 
 // --- Error Handling Middleware ---
 app.use(notFound);
