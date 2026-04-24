@@ -31,6 +31,8 @@ model User {
   studentProfile StudentProfile?
   facultyProfile FacultyProfile?
 
+  auditLogs      AuditLog[] @relation("UserAuditLogs")
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -90,6 +92,8 @@ model College {
   academicYears   AcademicYear[]
   batches         Batch[]
   notices         Notice[]
+  auditLogs       AuditLog[] @relation("CollegeAuditLogs")
+  admissionLeads  AdmissionLead[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -121,6 +125,7 @@ model Course {
 
   subjects     Subject[]
   batches      Batch[]
+  admissionLeads AdmissionLead[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -268,4 +273,41 @@ model Event {
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// --- newly added models ---
+
+model AuditLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  action      String   // e.g. "CREATED_YEAR", "DELETED_USER"
+  resource    String   // e.g. "AcademicYear", "User"
+  resourceId  String?
+  details     String?  // JSON string
+  
+  userId      String   @db.ObjectId
+  user        User     @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: Restrict)
+
+  collegeId   String   @db.ObjectId
+  college     College  @relation("CollegeAuditLogs", fields: [collegeId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+}
+
+model AdmissionLead {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  status      String   @default("NEW") // NEW, IN_PROGRESS, REJECTED, ENROLLED
+  notes       String?
+  
+  courseId    String   @db.ObjectId
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  collegeId   String   @db.ObjectId
+  college     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
