@@ -63,7 +63,7 @@ exports.enrollStudent = async (req, res) => {
       if (!firstCollege) {
         // Auto-seed for fresh production deployment
         firstCollege = await prisma.college.create({
-          data: { name: "PulseDesk Default", code: "PDC", email: "admin@pulsedesk.com", address: "Cloud", phone: "123" }
+          data: { name: "PulseDesk Default", address: "Cloud Provider", subdomain: "default" }
         });
       }
       collegeId = firstCollege.id;
@@ -131,7 +131,7 @@ exports.getStudents = async (req, res) => {
       let firstCollege = await prisma.college.findFirst();
       if (!firstCollege) {
         firstCollege = await prisma.college.create({
-          data: { name: "PulseDesk Default", code: "PDC", email: "admin@pulsedesk.com", address: "Cloud", phone: "123" }
+          data: { name: "PulseDesk Default", address: "Cloud Provider", subdomain: "default" }
         });
       }
       collegeId = firstCollege.id;
