@@ -17,7 +17,7 @@ export function NoticePanel() {
           Notice Board
         </h3>
         <Link 
-          href="/admin/notices/new" 
+          href="/notices/new" 
           className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
         >
           <Plus size={16} />
@@ -41,7 +41,7 @@ export function NoticePanel() {
       </div>
 
       <Link 
-        href="/admin/notices" 
+        href="/notices" 
         className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
       >
         View All Notices <ArrowRight size={14} />

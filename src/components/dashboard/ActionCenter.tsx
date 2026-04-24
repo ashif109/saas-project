@@ -9,7 +9,7 @@ const actions = [
     count: 42,
     priority: 'high',
     icon: FileWarning,
-    href: '/admin/fees',
+    href: '/fees',
     color: 'text-red-600',
     bg: 'bg-red-100 dark:bg-red-900/30 dark:text-red-400'
   },
@@ -19,7 +19,7 @@ const actions = [
     count: 8,
     priority: 'medium',
     icon: Users,
-    href: '/admin/timetable',
+    href: '/timetable',
     color: 'text-amber-600',
     bg: 'bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400'
   },
@@ -29,7 +29,7 @@ const actions = [
     count: 3,
     priority: 'high',
     icon: AlertCircle,
-    href: '/admin/timetable/conflicts',
+    href: '/timetable',
     color: 'text-red-600',
     bg: 'bg-red-100 dark:bg-red-900/30 dark:text-red-400'
   },
@@ -39,7 +39,7 @@ const actions = [
     count: 156,
     priority: 'low',
     icon: Clock,
-    href: '/admin/attendance',
+    href: '/attendance',
     color: 'text-slate-600 dark:text-slate-400',
     bg: 'bg-slate-100 dark:bg-slate-800'
   }
