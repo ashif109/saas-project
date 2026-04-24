@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Filter, User, GraduationCap, MoreVertical, Edit2, Trash2, Mail } from 'lucide-react';
+import { Plus, Search, Filter, User, GraduationCap, MoreVertical, Edit2, Trash2, Mail, Download, Upload, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Dialog, 
@@ -50,33 +50,68 @@ export default function StudentsPage() {
     semester: ''
   });
 
+  const [initialFetch, setInitialFetch] = useState(true);
+
+  React.useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      const res = await api.get('/api/students/list');
+      setStudentsList(res.data || []);
+    } catch (err) {
+      console.error('Fetch Students error:', err);
+    } finally {
+      setInitialFetch(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (studentsList.length === 0) return toast.info("No data to export");
+    const headers = ["ID", "Name", "Email", "Department", "Semester", "Status"];
+    const rows = studentsList.map(s => [s.id, s.name, s.email, s.department, s.semester, s.status]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "students_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDelete = async (studentId: string) => {
+    if (!confirm("Are you sure you want to completely revoke this student's enrollment?")) return;
+    try {
+      await api.delete(`/api/students/${studentId}`);
+      toast.success("Student revoked.");
+      setStudentsList(studentsList.filter(s => s._id !== studentId));
+    } catch (err) {
+      toast.error("Failed to revoke student.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     try {
-      // Send to backend (Assuming endpoint is being set up)
-      // await api.post('/api/students/enroll', formData);
+      const res = await api.post('/api/students/enroll', formData);
+      const newStudent = res.data.student;
       
-      // Real-time optimistic update for production feel
-      const newStudent = {
-        id: `STU${Math.floor(1000 + Math.random() * 9000)}`,
-        name: formData.name,
-        email: formData.email,
-        department: formData.department === 'cs' ? 'Computer Science' : 'Engineering',
-        semester: `${formData.semester} Semester`,
-        status: 'Active'
-      };
+      // We must close the dialog FIRST before mutating the large DOM list to prevent Radix Focus Trap errors
+      setIsDialogOpen(false);
       
-      setStudentsList([newStudent, ...studentsList]);
-      
-      toast.success('Student Enrolled successfully!');
-      
-      // Safely close dialog avoiding Radix unmount errors
+      // Delay DOM mutation slightly
       setTimeout(() => {
-        setIsDialogOpen(false);
+        setStudentsList([newStudent, ...studentsList]);
+        toast.success(res.data.message || 'Student Enrolled successfully!');
         setFormData({ name: '', email: '', department: '', semester: '' });
-      }, 100);
+      }, 300);
+      
+
       
     } catch (error) {
       toast.error('Failed to enroll student. Please check network.');
@@ -99,12 +134,20 @@ export default function StudentsPage() {
             <h1 className="text-3xl font-headline font-bold text-foreground">Student Management</h1>
             <p className="text-muted-foreground">Manage and track student profiles, enrollments, and status</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="pulse-hover">
-                <Plus className="h-4 w-4 mr-2" /> Enroll Student
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" className="bg-white" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Button variant="outline" className="bg-white">
+              <Upload className="h-4 w-4 mr-2" /> Bulk Import
+            </Button>
+            
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="pulse-hover">
+                  <Plus className="h-4 w-4 mr-2" /> Enroll Student
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Enroll New Student</DialogTitle>
@@ -203,12 +246,23 @@ export default function StudentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id} className="group hover:bg-secondary/20">
+                  {initialFetch ? (
+                    Array(5).fill(0).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="pl-6"><div className="h-10 w-48 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-md"></div></TableCell>
+                        <TableCell><div className="h-4 w-16 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-md"></div></TableCell>
+                        <TableCell><div className="h-4 w-32 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-md"></div></TableCell>
+                        <TableCell><div className="h-4 w-24 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-md"></div></TableCell>
+                        <TableCell><div className="h-6 w-16 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-full"></div></TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredStudents.map((student) => (
+                    <TableRow key={student._id || student.id} className="group hover:bg-secondary/20 transition-colors">
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9">
-                            <AvatarImage src={`https://picsum.photos/seed/${student.id}/100/100`} />
+                            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${student.name}`} />
                             <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>
@@ -222,7 +276,7 @@ export default function StudentsPage() {
                       <TableCell className="text-sm font-bold">{student.semester}</TableCell>
                       <TableCell>
                         <Badge variant={student.status === 'Active' ? 'default' : 'secondary'} className={
-                          student.status === 'Active' ? 'bg-green-100 text-green-700 hover:bg-green-100 border-none' : 'border-none'
+                          student.status === 'Active' ? 'bg-green-100 text-green-700 hover:bg-green-100 border-none px-3' : 'border-none px-3'
                         }>
                           {student.status}
                         </Badge>
@@ -237,7 +291,7 @@ export default function StudentsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem><Edit2 className="h-4 w-4 mr-2" /> Edit Profile</DropdownMenuItem>
                             <DropdownMenuItem><Mail className="h-4 w-4 mr-2" /> Send Email</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" /> Revoke Enrollment</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDelete(student._id)} className="text-destructive"><Trash2 className="h-4 w-4 mr-2" /> Revoke Enrollment</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
