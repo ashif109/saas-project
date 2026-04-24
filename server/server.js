@@ -13,42 +13,15 @@ dotenv.config();
 const app = express();
 
 // --- CORS Configuration ---
-const allowedOrigins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://saas-project-steel.vercel.app",
-    "https://saas-project-fcu1yvm4y-ashif109s-projects.vercel.app",
-    "https://saas-project-git-main-ashif109s-projects.vercel.app"
-];
-
-app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    // Allow requests with no origin (like curl) or specific allowed origins
-    const isVercelPreview = origin && origin.endsWith(".vercel.app");
-    const isAllowedHost = origin && (allowedOrigins.includes(origin) || allowedOrigins.includes(origin + "/"));
-    
-    // Safely set Allow-Origin if matched
-    if (isAllowedHost || isVercelPreview) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (origin) {
-        // As a fallback for development/testing, or if you want to be generic
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    }
-
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-    );
-
-    // Eagerly return 200 for OPTIONS preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    next();
-});
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow all origins for the multi-tenant SaaS frontend dynamically
+        callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'OPTIONS', 'PATCH', 'DELETE', 'POST', 'PUT'],
+    allowedHeaders: ['X-CSRF-Token', 'X-Requested-With', 'Accept', 'Accept-Version', 'Content-Length', 'Content-MD5', 'Content-Type', 'Date', 'X-Api-Version', 'Authorization']
+}));
 
 // --- Middleware ---
 app.use(express.json({ limit: '10mb' }));
