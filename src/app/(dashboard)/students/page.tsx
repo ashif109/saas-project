@@ -8,24 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Filter, User, GraduationCap, MoreVertical, Edit2, Trash2, Mail, Download, Upload, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import { EnrollStudentDialog } from './components/EnrollStudentDialog';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -38,17 +22,7 @@ import api from '@/lib/axios';
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [studentsList, setStudentsList] = useState<any[]>([]);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    department: '',
-    semester: ''
-  });
 
   const [initialFetch, setInitialFetch] = useState(true);
 
@@ -93,31 +67,8 @@ export default function StudentsPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const res = await api.post('/api/students/enroll', formData);
-      const newStudent = res.data.student;
-      
-      // We must close the dialog FIRST before mutating the large DOM list to prevent Radix Focus Trap errors
-      setIsDialogOpen(false);
-      
-      // Delay DOM mutation slightly
-      setTimeout(() => {
-        setStudentsList([newStudent, ...studentsList]);
-        toast.success(res.data.message || 'Student Enrolled successfully!');
-        setFormData({ name: '', email: '', department: '', semester: '' });
-      }, 300);
-      
-
-      
-    } catch (error) {
-      toast.error('Failed to enroll student. Please check network.');
-    } finally {
-      setLoading(false);
-    }
+  const handleStudentEnrolled = (newStudent: any) => {
+    setStudentsList([newStudent, ...studentsList]);
   };
   
   const filteredStudents = studentsList.filter(student => 
@@ -141,76 +92,7 @@ export default function StudentsPage() {
             <Button variant="outline" className="bg-white">
               <Upload className="h-4 w-4 mr-2" /> Bulk Import
             </Button>
-            
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="pulse-hover">
-                  <Plus className="h-4 w-4 mr-2" /> Enroll Student
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="max-w-2xl" aria-describedby={undefined} onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
-              <DialogHeader>
-                <DialogTitle>Enroll New Student</DialogTitle>
-                <DialogDescription>Enter academic and personal details to create a new student record.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sname">Full Name</Label>
-                    <Input 
-                      id="sname" 
-                      placeholder="Alex Johnson" 
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="semail">College Email</Label>
-                    <Input 
-                      id="semail" 
-                      type="email" 
-                      placeholder="alex@college.edu" 
-                      required
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sdept">Department</Label>
-                    <Select value={formData.department} onValueChange={(val) => setFormData({...formData, department: val})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cs">Computer Science</SelectItem>
-                        <SelectItem value="me">Mechanical</SelectItem>
-                        <SelectItem value="phy">Physics</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ssem">Semester</Label>
-                    <Select value={formData.semester} onValueChange={(val) => setFormData({...formData, semester: val})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Semester" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1st Semester</SelectItem>
-                        <SelectItem value="2">2nd Semester</SelectItem>
-                        <SelectItem value="3">3rd Semester</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? 'Enrolling...' : 'Complete Enrollment'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+            <EnrollStudentDialog onStudentEnrolled={handleStudentEnrolled} />
         </div>
 
         <Card className="border-none shadow-sm">
