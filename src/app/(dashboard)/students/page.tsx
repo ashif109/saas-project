@@ -148,7 +148,7 @@ export default function StudentsPage() {
                   <Plus className="h-4 w-4 mr-2" /> Enroll Student
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl" aria-describedby={undefined} onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
               <DialogHeader>
                 <DialogTitle>Enroll New Student</DialogTitle>
                 <DialogDescription>Enter academic and personal details to create a new student record.</DialogDescription>
