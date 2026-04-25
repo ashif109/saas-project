@@ -118,6 +118,7 @@ exports.enrollStudent = async (req, res) => {
     res.status(201).json({
       message: "Student enrolled successfully",
       student: {
+        _id: newStudent.id,
         id: newStudent.studentProfile.enrollmentNo,
         name: `${newStudent.firstName} ${newStudent.lastName}`,
         email: newStudent.email,
