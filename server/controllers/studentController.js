@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 const bcrypt = require('bcryptjs');
 
 /**
@@ -54,7 +53,17 @@ async function ensureDefaultBatch(collegeId) {
 
 exports.enrollStudent = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ message: "Request body is missing" });
+    }
+
     const { name, email, department, semester } = req.body;
+    
+    // Basic Validation
+    if (!name || !email) {
+      return res.status(400).json({ message: "Name and email are required fields." });
+    }
+
     // req.user might be from authMiddleware
     // If not, we will rely on a collegeId passed or fallback to first college for dev testing
     let collegeId = req.user?.collegeId;
@@ -78,8 +87,8 @@ exports.enrollStudent = async (req, res) => {
     // Auto-generate generic batch to prevent relation crashing
     const batch = await ensureDefaultBatch(collegeId);
 
-    // Split name
-    const nameParts = name.split(' ');
+    // Split name safely
+    const nameParts = name.trim().split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
@@ -119,8 +128,17 @@ exports.enrollStudent = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Enroll Error:', error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error('Enroll Error Details:', error);
+    
+    // Check for Prisma specific errors (e.g., connection timeout, validation error)
+    if (error.code) {
+      console.error(`Prisma Error Code: ${error.code}`);
+    }
+    
+    res.status(500).json({ 
+      message: "Internal server error", 
+      error: error.message || String(error)
+    });
   }
 };
 
