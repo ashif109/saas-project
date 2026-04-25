@@ -214,3 +214,68 @@ exports.deleteStudent = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+exports.updateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, status } = req.body;
+
+    const user = await prisma.user.findFirst({
+      where: { id: id },
+      include: { studentProfile: true }
+    });
+
+    if (!user) return res.status(404).json({ message: "Student not found" });
+
+    // Check email uniqueness if email changed
+    if (email && email !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) return res.status(400).json({ message: "Email is already registered to another user." });
+    }
+
+    // Prepare data
+    const dataToUpdate = {};
+    if (name) {
+      const parts = name.trim().split(' ');
+      dataToUpdate.firstName = parts[0];
+      dataToUpdate.lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
+    }
+    if (email) dataToUpdate.email = email;
+    if (phone !== undefined) dataToUpdate.phone = phone;
+    if (status !== undefined) dataToUpdate.isActive = status === 'Active';
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: dataToUpdate,
+      include: {
+        studentProfile: {
+          include: {
+            batch: {
+              include: { course: { include: { department: true } } }
+            }
+          }
+        }
+      }
+    });
+
+    const deptName = updatedUser.studentProfile?.batch?.course?.department?.name || 'General';
+
+    res.status(200).json({
+      message: "Student profile updated successfully",
+      student: {
+        _id: updatedUser.id,
+        id: updatedUser.studentProfile?.enrollmentNo,
+        name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+        email: updatedUser.email,
+        phone: updatedUser.phone || '',
+        department: deptName,
+        semester: '1st Semester',
+        status: updatedUser.isActive ? 'Active' : 'Suspended'
+      }
+    });
+
+  } catch (error) {
+    console.error('Update Student Error:', error);
+    res.status(500).json({ message: "Internal server error updating student profile" });
+  }
+};

@@ -10,6 +10,7 @@ import { Plus, Search, Filter, User, GraduationCap, MoreVertical, Edit2, Trash2,
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { EnrollStudentDialog } from './components/EnrollStudentDialog';
+import { EditStudentDialog } from './components/EditStudentDialog';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -23,7 +24,8 @@ import api from '@/lib/axios';
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [studentsList, setStudentsList] = useState<any[]>([]);
-
+  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [initialFetch, setInitialFetch] = useState(true);
 
   React.useEffect(() => {
@@ -69,6 +71,12 @@ export default function StudentsPage() {
 
   const handleStudentEnrolled = (newStudent: any) => {
     setStudentsList([newStudent, ...studentsList]);
+  };
+  
+  const handleStudentUpdated = (updatedStudent: any) => {
+    setStudentsList(studentsList.map(s => 
+      (s._id === updatedStudent._id || s.id === updatedStudent.id) ? updatedStudent : s
+    ));
   };
   
   const filteredStudents = studentsList.filter(student => 
@@ -172,7 +180,7 @@ export default function StudentsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem><Edit2 className="h-4 w-4 mr-2" /> Edit Profile</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setEditingStudent(student); setIsEditDialogOpen(true); }}><Edit2 className="h-4 w-4 mr-2" /> Edit Profile</DropdownMenuItem>
                             <DropdownMenuItem><Mail className="h-4 w-4 mr-2" /> Send Email</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDelete(student._id)} className="text-destructive"><Trash2 className="h-4 w-4 mr-2" /> Revoke Enrollment</DropdownMenuItem>
                           </DropdownMenuContent>
@@ -195,6 +203,12 @@ export default function StudentsPage() {
             )}
           </CardContent>
         </Card>
+        <EditStudentDialog 
+          student={editingStudent} 
+          isOpen={isEditDialogOpen} 
+          onClose={() => setIsEditDialogOpen(false)} 
+          onStudentUpdated={handleStudentUpdated} 
+        />
       </div>
     </DashboardLayout>
   );
