@@ -4,7 +4,16 @@ let prisma;
 
 // Robust fallback for Vercel serverless environments
 // If DATABASE_URL is missing, we gracefully fall back to MONGO_URI
-const connectionUrl = process.env.DATABASE_URL || process.env.MONGO_URI;
+let connectionUrl = process.env.DATABASE_URL || process.env.MONGO_URI;
+
+// FIX: If they only provided MONGO_URI in Vercel and it's missing the database name, 
+// Prisma will throw "AtlasError: empty database name not allowed" (Error 8000).
+// Mongoose allows empty DB names, but Prisma strictly requires it.
+if (connectionUrl && connectionUrl.includes('.mongodb.net/?')) {
+  connectionUrl = connectionUrl.replace('.mongodb.net/?', '.mongodb.net/pulsedesk?');
+} else if (connectionUrl && connectionUrl.endsWith('.mongodb.net/')) {
+  connectionUrl = connectionUrl + 'pulsedesk';
+}
 
 // We explicitly inject the url. This prevents Prisma from crashing with 
 // "Environment variable not found: DATABASE_URL" if it tries to read schema.prisma natively.
