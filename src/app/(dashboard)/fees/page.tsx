@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CreditCard, DollarSign, AlertCircle, CheckCircle2, Plus, Settings2, Trash2, Edit, Loader2, Download, Search, Filter, History, Landmark, Receipt } from 'lucide-react';
+import { CreditCard, DollarSign, AlertCircle, CheckCircle2, Plus, Settings2, Trash2, Edit, Loader2, Download, Search, Filter, History, Landmark, Receipt, FileText } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -92,11 +92,24 @@ export default function FeesPage() {
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!paymentForm.studentId || !paymentForm.amount) {
+        toast({ title: "Validation Error", description: "Please select a student and enter amount.", variant: "destructive" });
+        return;
+    }
     setSubmitting(true);
     try {
       await api.post('/api/finance/transactions', paymentForm);
       toast({ title: "Receipt Generated", description: "Payment has been recorded successfully." });
       setOpenPayment(false);
+      // Reset form
+      setPaymentForm({
+        amount: '',
+        studentId: '',
+        feeStructureId: '',
+        paymentMethod: 'Cash',
+        type: 'Tuition',
+        status: 'PAID'
+      });
       fetchData();
     } catch (err) {
       toast({ title: "Failed", description: "Could not process payment entry.", variant: "destructive" });
@@ -118,6 +131,54 @@ export default function FeesPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDownloadReceipt = (tx: any) => {
+    // Production-ready mock: Open a print-friendly window with receipt details
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const content = `
+      <html>
+        <head>
+          <title>Receipt - ${tx.receiptNo}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 15px; }
+            .label { font-weight: bold; color: #666; }
+            .footer { margin-top: 60px; text-align: center; font-size: 12px; color: #999; }
+            .stamp { border: 2px solid #22c55e; color: #22c55e; padding: 10px; display: inline-block; transform: rotate(-5deg); font-weight: bold; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>PULSEDESK RECEIPT</h1>
+            <p>Official Academic Payment Record</p>
+          </div>
+          <div class="row"><span class="label">Receipt Number:</span> <span>${tx.receiptNo}</span></div>
+          <div class="row"><span class="label">Date:</span> <span>${new Date(tx.paymentDate).toLocaleDateString()}</span></div>
+          <hr/>
+          <div class="row"><span class="label">Student Name:</span> <span>${tx.student?.user?.firstName} ${tx.student?.user?.lastName}</span></div>
+          <div class="row"><span class="label">Enrollment No:</span> <span>${tx.student?.enrollmentNo}</span></div>
+          <div class="row"><span class="label">Payment For:</span> <span>${tx.type}</span></div>
+          <div class="row"><span class="label">Payment Method:</span> <span>${tx.paymentMethod}</span></div>
+          <hr/>
+          <div class="row" style="font-size: 24px; margin-top: 20px;">
+            <span class="label">Total Amount:</span> <span>₹${tx.amount.toLocaleString()}</span>
+          </div>
+          <div style="text-align: right;"><div class="stamp">PAID & VERIFIED</div></div>
+          <div class="footer">
+            <p>This is a computer generated receipt and does not require a physical signature.</p>
+            <p>© ${new Date().getFullYear()} PulseDesk Management Platform</p>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(content);
+    printWindow.document.close();
   };
 
   return (
@@ -152,7 +213,7 @@ export default function FeesPage() {
                         <Select required onValueChange={(v) => setPaymentForm({...paymentForm, studentId: v})}>
                             <SelectTrigger className="h-11"><SelectValue placeholder="Search Student" /></SelectTrigger>
                             <SelectContent>
-                                {students.map(s => <SelectItem key={s.id} value={s.id}>{s.user?.firstName} {s.user?.lastName} ({s.enrollmentNo})</SelectItem>)}
+                                {students.map(s => <SelectItem key={s._id} value={s._id}>{s.name} ({s.id})</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -183,8 +244,8 @@ export default function FeesPage() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700 h-11 text-lg">
-                        {submitting && <Loader2 className="animate-spin mr-2 h-5 w-5" />} Record Payment
+                    <Button type="submit" disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700 h-11 text-lg rounded-xl font-bold">
+                        {submitting && <Loader2 className="animate-spin mr-2 h-5 w-5" />} Record & Generate Receipt
                     </Button>
                   </DialogFooter>
                 </form>
@@ -240,7 +301,7 @@ export default function FeesPage() {
                     <CardTitle className="text-xl font-bold">Transaction History</CardTitle>
                     <CardDescription>Live feed of all institutional payments</CardDescription>
                 </div>
-                <Button variant="outline" className="rounded-xl font-bold"><Filter className="w-4 h-4 mr-2" /> Filter</Button>
+                <Button variant="outline" className="rounded-xl font-bold hover:bg-white"><Filter className="w-4 h-4 mr-2" /> Filter</Button>
               </CardHeader>
               <CardContent className="p-0">
                 {loading ? (
@@ -253,7 +314,7 @@ export default function FeesPage() {
                             <TableHead className="text-[10px] font-black uppercase tracking-widest">Type</TableHead>
                             <TableHead className="text-[10px] font-black uppercase tracking-widest">Amount</TableHead>
                             <TableHead className="text-[10px] font-black uppercase tracking-widest">Date</TableHead>
-                            <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-8">Actions</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-8">Receipt</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -274,7 +335,14 @@ export default function FeesPage() {
                                 <TableCell className="font-black text-slate-900">₹{tx.amount.toLocaleString()}</TableCell>
                                 <TableCell className="text-slate-500 text-sm font-medium">{new Date(tx.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</TableCell>
                                 <TableCell className="text-right pr-8">
-                                    <Button variant="ghost" size="icon" className="text-slate-300 hover:text-indigo-600"><Download className="h-4 w-4" /></Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => handleDownloadReceipt(tx)}
+                                        className="text-indigo-600 font-bold hover:bg-indigo-50 rounded-lg"
+                                    >
+                                        <Download className="h-4 w-4 mr-2" /> Download
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                             ))}
@@ -293,7 +361,7 @@ export default function FeesPage() {
                 </div>
                 <Dialog open={openStructure} onOpenChange={setOpenStructure}>
                     <DialogTrigger asChild>
-                        <Button className="bg-slate-900 hover:bg-slate-800 rounded-2xl h-11 px-6"><Plus className="h-4 w-4 mr-2" /> Define New Structure</Button>
+                        <Button className="bg-slate-900 hover:bg-slate-800 rounded-2xl h-11 px-6 font-bold shadow-lg shadow-slate-200"><Plus className="h-4 w-4 mr-2" /> Define New Structure</Button>
                     </DialogTrigger>
                     <DialogContent className="rounded-3xl border-none shadow-2xl">
                         <form onSubmit={handleStructureSubmit}>
@@ -321,7 +389,7 @@ export default function FeesPage() {
                                     <Input placeholder="Brief details about this fee" value={structureForm.description} onChange={(e) => setStructureForm({...structureForm, description: e.target.value})} className="h-11" />
                                 </div>
                             </div>
-                            <DialogFooter><Button type="submit" disabled={submitting} className="w-full bg-slate-900 h-11">Save Structure</Button></DialogFooter>
+                            <DialogFooter><Button type="submit" disabled={submitting} className="w-full bg-slate-900 h-11 rounded-xl font-bold">Save Structure</Button></DialogFooter>
                         </form>
                     </DialogContent>
                 </Dialog>
