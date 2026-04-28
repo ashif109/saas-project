@@ -8,9 +8,9 @@ exports.createAcademicYear = async (req, res) => {
       return res.status(400).json({ message: "Name, startDate and endDate are required." });
     }
 
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 
@@ -38,9 +38,9 @@ exports.createAcademicYear = async (req, res) => {
 
 exports.getAcademicYears = async (req, res) => {
   try {
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 

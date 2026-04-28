@@ -43,7 +43,7 @@ export default function AddStudentPage() {
     };
 
     try {
-      await api.post('/api/students', data);
+      await api.post('/api/students/enroll', data);
       toast({
         title: "Success",
         description: "Student registered successfully. Credentials sent to email.",

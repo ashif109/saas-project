@@ -8,9 +8,9 @@ exports.createNotice = async (req, res) => {
       return res.status(400).json({ message: "Title and content are required." });
     }
 
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 
@@ -39,9 +39,9 @@ exports.createNotice = async (req, res) => {
 
 exports.getNotices = async (req, res) => {
   try {
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 

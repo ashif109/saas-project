@@ -9,9 +9,9 @@ exports.onboardFaculty = async (req, res) => {
       return res.status(400).json({ message: "Name, email and department are required." });
     }
 
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       if (!firstCollege) {
         firstCollege = await prisma.college.create({
           data: { name: "PulseDesk Default", address: "Cloud Provider", subdomain: "default" }
@@ -73,9 +73,9 @@ exports.onboardFaculty = async (req, res) => {
 
 exports.getFaculties = async (req, res) => {
   try {
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 

@@ -252,7 +252,10 @@ export default function AcademicSetupPage() {
             {activeTab !== 'years' && (
               <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4 py-20">
                 <div className="p-6 bg-slate-50 rounded-3xl">
-                    {tabs.find(t => t.id === activeTab)?.icon({ size: 48, className: "text-slate-200" })}
+                    {(() => {
+                        const Icon = tabs.find(t => t.id === activeTab)?.icon;
+                        return Icon ? <Icon size={48} className="text-slate-200" /> : null;
+                    })()}
                 </div>
                 <div className="text-center">
                     <p className="font-bold text-slate-600 text-lg">Manage {tabs.find(t => t.id === activeTab)?.label}</p>

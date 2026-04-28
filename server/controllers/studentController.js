@@ -66,9 +66,9 @@ exports.enrollStudent = async (req, res) => {
 
     // req.user might be from authMiddleware
     // If not, we will rely on a collegeId passed or fallback to first college for dev testing
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       if (!firstCollege) {
         // Auto-seed for fresh production deployment
         firstCollege = await prisma.college.create({

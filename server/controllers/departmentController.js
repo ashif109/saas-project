@@ -8,9 +8,9 @@ exports.createDepartment = async (req, res) => {
       return res.status(400).json({ message: "Name and code are required." });
     }
 
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 
@@ -37,9 +37,9 @@ exports.createDepartment = async (req, res) => {
 
 exports.getDepartments = async (req, res) => {
   try {
-    let collegeId = req.user?.collegeId;
+    let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
+      const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 
