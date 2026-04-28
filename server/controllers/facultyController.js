@@ -56,6 +56,7 @@ exports.onboardFaculty = async (req, res) => {
     res.status(201).json({
       message: "Faculty onboarded successfully",
       faculty: {
+        _id: newFaculty.id,
         id: newFaculty.facultyProfile.employeeId,
         name: `${newFaculty.firstName} ${newFaculty.lastName}`,
         email: newFaculty.email,
@@ -97,12 +98,11 @@ exports.getFaculties = async (req, res) => {
     });
 
     const mapped = faculties.map(f => ({
+      _id: f.id,
       id: f.facultyProfile?.employeeId,
       name: `${f.firstName} ${f.lastName}`,
       email: f.email,
-      role: 'Professor', // This could be saved in a 'designation' field in FacultyProfile if we had one, but the schema doesn't have it yet. 
-      // I'll stick to a default or we can add it to schema. 
-      // Actually, let's just use 'Professor' for now as per the placeholder.
+      role: 'Professor', 
       department: f.facultyProfile?.department?.name || 'General',
       expertise: 'General',
       assignedSubjects: [],
@@ -113,5 +113,71 @@ exports.getFaculties = async (req, res) => {
   } catch (error) {
     console.error('Fetch Faculty Error:', error);
     res.status(500).json({ message: "Internal server error fetching faculty" });
+  }
+};
+
+exports.updateFaculty = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, designation, departmentId } = req.body;
+
+    const nameParts = name ? name.trim().split(' ') : [];
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        firstName,
+        lastName,
+        email,
+        facultyProfile: {
+          update: {
+            departmentId: departmentId
+          }
+        }
+      },
+      include: {
+        facultyProfile: {
+          include: { department: true }
+        }
+      }
+    });
+
+    res.status(200).json({
+      message: "Faculty updated",
+      faculty: {
+        _id: updated.id,
+        id: updated.facultyProfile.employeeId,
+        name: `${updated.firstName} ${updated.lastName}`,
+        email: updated.email,
+        department: updated.facultyProfile.department?.name || 'General',
+        role: designation || 'Professor',
+        status: 'Available'
+      }
+    });
+  } catch (error) {
+    console.error('Update Faculty Error:', error);
+    res.status(500).json({ message: "Failed to update faculty" });
+  }
+};
+
+exports.deleteFaculty = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Delete profile first if cascade not configured
+    await prisma.facultyProfile.deleteMany({
+      where: { userId: id }
+    });
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    res.status(200).json({ message: "Faculty removed successfully" });
+  } catch (error) {
+    console.error('Delete Faculty Error:', error);
+    res.status(500).json({ message: "Failed to delete faculty" });
   }
 };
