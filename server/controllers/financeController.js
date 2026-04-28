@@ -18,7 +18,7 @@ exports.createTransaction = async (req, res) => {
       data: {
         amount: parseFloat(amount),
         studentId,
-        feeStructureId,
+        feeStructureId: feeStructureId || null,
         paymentMethod: paymentMethod || "Cash",
         type: type || "Tuition",
         status: status || "PAID",
