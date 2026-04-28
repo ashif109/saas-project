@@ -1,11 +1,36 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Calendar, Layers, BookOpen, Clock, Plus, Settings2 } from 'lucide-react';
+import { Calendar, Layers, BookOpen, Clock, Plus, Settings2, Loader2, Info } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/axios';
 
 export default function AcademicSetupPage() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('years');
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openYearDialog, setOpenYearDialog] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [yearForm, setYearForm] = useState({
+    name: '',
+    startDate: '',
+    endDate: ''
+  });
 
   const tabs = [
     { id: 'years', label: 'Academic Years', icon: Calendar },
@@ -14,82 +39,228 @@ export default function AcademicSetupPage() {
     { id: 'terms', label: 'Semesters / Terms', icon: Clock },
   ];
 
+  const fetchYears = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/academic-years');
+      setAcademicYears(res.data);
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Failed to fetch academic years.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchYears();
+  }, []);
+
+  const handleYearSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.post('/api/academic-years', yearForm);
+      toast({
+        title: "Success",
+        description: "Academic year created successfully.",
+      });
+      setOpenYearDialog(false);
+      setYearForm({ name: '', startDate: '', endDate: '' });
+      fetchYears();
+    } catch (err: any) {
+      toast({
+        title: "Failed",
+        description: err.response?.data?.message || "Something went wrong.",
+        variant: "destructive"
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-6xl space-y-6 animate-in fade-in duration-500">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-              <Settings2 className="w-8 h-8 text-blue-500" />
-              Academic Setup
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-2">
-              Configure your institutional structure, timelines, and academic requirements here.
-            </p>
+      <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-600/10 rounded-2xl">
+                <Settings2 className="w-8 h-8 text-blue-600" />
+            </div>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                Academic Setup
+                </h1>
+                <p className="text-slate-500 mt-1">
+                Configure your institutional structure, timelines, and academic requirements.
+                </p>
+            </div>
           </div>
-          <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm">
-            <Plus size={16} />
-            Create New {tabs.find(t => t.id === activeTab)?.label.split(' ')[0]}
-          </button>
+          
+          <Dialog open={openYearDialog} onOpenChange={setOpenYearDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 px-6 py-6 rounded-2xl font-bold">
+                <Plus className="mr-2 h-5 w-5" />
+                Create New Academic Year
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="border-none shadow-2xl">
+              <form onSubmit={handleYearSubmit}>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold">Configure Academic Year</DialogTitle>
+                  <DialogDescription>Set the timeline for the new academic session.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-6 py-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="yearName">Session Name</Label>
+                    <Input 
+                      id="yearName" 
+                      placeholder="e.g. 2024 - 2025" 
+                      required 
+                      value={yearForm.name}
+                      onChange={(e) => setYearForm({...yearForm, name: e.target.value})}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startDate">Start Date</Label>
+                      <Input 
+                        id="startDate" 
+                        type="date" 
+                        required 
+                        value={yearForm.startDate}
+                        onChange={(e) => setYearForm({...yearForm, startDate: e.target.value})}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endDate">End Date</Label>
+                      <Input 
+                        id="endDate" 
+                        type="date" 
+                        required 
+                        value={yearForm.endDate}
+                        onChange={(e) => setYearForm({...yearForm, endDate: e.target.value})}
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="ghost" onClick={() => setOpenYearDialog(false)}>Cancel</Button>
+                  <Button type="submit" disabled={submitting} className="bg-blue-600 hover:bg-blue-700 px-8">
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Create Session
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <div className="bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="flex overflow-x-auto border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 px-4 pt-4 hide-scrollbar">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+          <div className="flex overflow-x-auto border-b border-slate-100 bg-slate-50/30 px-6 pt-6 hide-scrollbar gap-2">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-6 py-4 font-bold text-sm transition-all whitespace-nowrap rounded-t-2xl ${
                   activeTab === tab.id 
-                    ? 'border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-400' 
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:hover:text-slate-300'
+                    ? 'bg-white text-blue-600 shadow-[0_-4px_0_0_#2563eb] border-x border-t border-slate-100' 
+                    : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
-                <tab.icon size={16} />
+                <tab.icon size={18} />
                 {tab.label}
               </button>
             ))}
           </div>
 
-          <div className="p-6 min-h-[400px]">
+          <div className="p-8 min-h-[500px]">
             {activeTab === 'years' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/10 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-blue-900 dark:text-blue-300">2023 - 2024 (Active)</h3>
-                    <p className="text-sm text-blue-700/80 dark:text-blue-400/80">Jul 1, 2023 - Jun 30, 2024</p>
-                  </div>
-                  <span className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">Current</span>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-bold text-slate-800">Available Academic Sessions</h2>
+                    <div className="p-2 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium flex items-center gap-2">
+                        <Info className="w-4 h-4" />
+                        Only one session can be "Active" at a time.
+                    </div>
                 </div>
-                
-                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
-                  <div>
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-300">2024 - 2025</h3>
-                    <p className="text-sm text-slate-500">Jul 1, 2024 - Jun 30, 2025</p>
-                  </div>
-                  <span className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">Draft</span>
-                </div>
+
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <Loader2 className="w-10 h-10 animate-spin mb-4 text-blue-500" />
+                        <p className="font-medium">Loading session timelines...</p>
+                    </div>
+                ) : academicYears.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-3xl text-slate-400">
+                         <Calendar className="w-12 h-12 mb-4 opacity-10" />
+                         <p>No academic years configured yet.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                        {academicYears.map((year, idx) => (
+                            <div 
+                                key={year.id} 
+                                className={`p-6 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                                    idx === 0 
+                                    ? 'border-blue-100 bg-blue-50/50 shadow-sm' 
+                                    : 'border-slate-100 hover:border-slate-200'
+                                }`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-3 rounded-xl ${idx === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        <Calendar className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className={`font-bold text-lg ${idx === 0 ? 'text-blue-900' : 'text-slate-700'}`}>
+                                            {year.name} {idx === 0 && "(Active)"}
+                                        </h3>
+                                        <p className="text-sm text-slate-500 font-medium">
+                                            {new Date(year.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} 
+                                            {" — "} 
+                                            {new Date(year.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {idx === 0 ? (
+                                        <span className="bg-blue-600 text-white text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-widest shadow-lg shadow-blue-600/30">
+                                            CURRENT
+                                        </span>
+                                    ) : (
+                                        <span className="bg-slate-200 text-slate-500 text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-widest">
+                                            DRAFT
+                                        </span>
+                                    )}
+                                    <Button variant="ghost" size="icon" className="text-slate-400">
+                                        <Settings2 className="w-5 h-5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
               </div>
             )}
 
-            {activeTab === 'courses' && (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3 py-10">
-                <BookOpen size={48} className="text-slate-200 dark:text-slate-800" />
-                <p>No courses defined yet. Click "Create New Course" to start.</p>
-              </div>
-            )}
-
-            {activeTab === 'batches' && (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3 py-10">
-                <Layers size={48} className="text-slate-200 dark:text-slate-800" />
-                <p>Batch management helps you map students to their respective years and courses.</p>
-              </div>
-            )}
-            
-             {activeTab === 'terms' && (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3 py-10">
-                <Clock size={48} className="text-slate-200 dark:text-slate-800" />
-                <p>Configure Semesters (Odd/Even) within your chosen academic year.</p>
+            {activeTab !== 'years' && (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4 py-20">
+                <div className="p-6 bg-slate-50 rounded-3xl">
+                    {tabs.find(t => t.id === activeTab)?.icon({ size: 48, className: "text-slate-200" })}
+                </div>
+                <div className="text-center">
+                    <p className="font-bold text-slate-600 text-lg">Manage {tabs.find(t => t.id === activeTab)?.label}</p>
+                    <p className="text-sm max-w-xs mx-auto">Click the button above to start configuring your institutional structure.</p>
+                </div>
+                <Button variant="outline" className="rounded-xl border-slate-200 text-slate-600 font-bold">
+                    Learn More &rarr;
+                </Button>
               </div>
             )}
           </div>

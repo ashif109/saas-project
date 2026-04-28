@@ -52,6 +52,10 @@ app.use('/api/logs', require('./routes/logRoutes'));
 app.use('/api/system', require('./routes/systemRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
+app.use('/api/faculty', require('./routes/facultyRoutes'));
+app.use('/api/departments', require('./routes/departmentRoutes'));
+app.use('/api/academic-years', require('./routes/academicRoutes'));
+app.use('/api/notices', require('./routes/noticeRoutes'));
 
 // --- Error Handling Middleware ---
 app.use(notFound);
