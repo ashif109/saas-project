@@ -57,3 +57,40 @@ exports.getAcademicYears = async (req, res) => {
     res.status(500).json({ message: "Internal server error fetching academic years" });
   }
 };
+
+exports.updateAcademicYear = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, startDate, endDate } = req.body;
+
+    const updated = await prisma.academicYear.update({
+      where: { id },
+      data: {
+        name,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined
+      }
+    });
+
+    res.status(200).json({
+      message: "Academic year updated successfully",
+      academicYear: updated
+    });
+  } catch (error) {
+    console.error('Update Academic Year Error:', error);
+    res.status(500).json({ message: "Failed to update academic year" });
+  }
+};
+
+exports.deleteAcademicYear = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.academicYear.delete({
+      where: { id }
+    });
+    res.status(200).json({ message: "Academic year deleted successfully" });
+  } catch (error) {
+    console.error('Delete Academic Year Error:', error);
+    res.status(500).json({ message: "Failed to delete academic year" });
+  }
+};
