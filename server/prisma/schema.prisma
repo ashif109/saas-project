@@ -92,6 +92,8 @@ model College {
   academicYears   AcademicYear[]
   batches         Batch[]
   notices         Notice[]
+  feeStructures   FeeStructure[]
+  transactions    Transaction[]
   auditLogs       AuditLog[] @relation("CollegeAuditLogs")
   admissionLeads  AdmissionLead[]
 
@@ -126,6 +128,7 @@ model Course {
   subjects     Subject[]
   batches      Batch[]
   admissionLeads AdmissionLead[]
+  feeStructures  FeeStructure[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -195,6 +198,8 @@ model StudentProfile {
 
   batchId        String   @db.ObjectId
   batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  transactions   Transaction[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -314,4 +319,44 @@ model AdmissionLead {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model FeeStructure {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  name           String   // e.g. "Tuition Fee 2024"
+  amount         Float
+  description    String?
+  
+  courseId       String?  @db.ObjectId
+  course         Course?  @relation(fields: [courseId], references: [id])
+
+  collegeId      String   @db.ObjectId
+  college        College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  transactions   Transaction[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Transaction {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  amount         Float
+  paymentDate    DateTime @default(now())
+  paymentMethod  String   // "Cash", "Online", "Bank Transfer"
+  status         String   @default("PAID") // PAID, PENDING, FAILED
+  receiptNo      String?  @unique
+  type           String?  @default("Tuition") // Tuition, Exam Fee, etc.
+  
+  studentId      String   @db.ObjectId
+  student        StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  feeStructureId String?  @db.ObjectId
+  feeStructure   FeeStructure? @relation(fields: [feeStructureId], references: [id])
+
+  collegeId      String   @db.ObjectId
+  college        College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
