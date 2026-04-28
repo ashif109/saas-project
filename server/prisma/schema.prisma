@@ -143,8 +143,9 @@ model Subject {
   semester    Int // Which semester it belongs to
 
   facultyAssignments FacultySubject[]
+  timetables         TimetableEntry[]
 
-  createdAt   DateTime @default(now())
+  createdAt   DateTime   @default(now())
   updatedAt   DateTime @updatedAt
 }
 
@@ -240,6 +241,9 @@ model TimetableEntry {
 
   facultyId      String   @db.ObjectId
   faculty        FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  subjectId      String?  @db.ObjectId
+  subject        Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
