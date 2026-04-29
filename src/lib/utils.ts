@@ -6,20 +6,30 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function colorToHSL(color: string): string {
-  if (typeof window === 'undefined') return '221.2 83.2% 53.3%'; // Default fallback
-
-  const tempEl = document.createElement('div');
-  tempEl.style.color = color;
-  document.body.appendChild(tempEl);
-  const rgbColor = window.getComputedStyle(tempEl).color;
-  document.body.removeChild(tempEl);
-
-  const rgbMatch = rgbColor.match(/\d+/g);
-  if (!rgbMatch) return '221.2 83.2% 53.3%';
-
-  const r = parseInt(rgbMatch[0]) / 255;
-  const g = parseInt(rgbMatch[1]) / 255;
-  const b = parseInt(rgbMatch[2]) / 255;
+  // Simple hex to RGB parser
+  let r = 0, g = 0, b = 0;
+  
+  if (color.startsWith('#')) {
+    if (color.length === 4) {
+      r = parseInt(color[1] + color[1], 16) / 255;
+      g = parseInt(color[2] + color[2], 16) / 255;
+      b = parseInt(color[3] + color[3], 16) / 255;
+    } else {
+      r = parseInt(color.slice(1, 3), 16) / 255;
+      g = parseInt(color.slice(3, 5), 16) / 255;
+      b = parseInt(color.slice(5, 7), 16) / 255;
+    }
+  } else if (color.startsWith('rgb')) {
+    const rgbMatch = color.match(/\d+/g);
+    if (rgbMatch) {
+      r = parseInt(rgbMatch[0]) / 255;
+      g = parseInt(rgbMatch[1]) / 255;
+      b = parseInt(rgbMatch[2]) / 255;
+    }
+  } else {
+    // Fallback for named colors or other formats
+    return '221.2 83.2% 53.3%';
+  }
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);

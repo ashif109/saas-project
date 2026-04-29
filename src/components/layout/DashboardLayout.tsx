@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   SidebarProvider, 
   Sidebar, 
@@ -194,13 +194,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!mounted || !user) return null;
 
-  const menuItems = (user.role === 'SUPER_ADMIN' ? SUPER_ADMIN_ITEMS : COLLEGE_ADMIN_ITEMS).filter(item => {
-    if (item.title === 'Doubts' && settings && !settings.globalDoubtSystem) return false;
-    if (item.title === 'Attendance' && settings && !settings.globalAttendance) return false;
-    if (item.title === 'Analytics' && settings && !settings.globalAnalytics) return false;
-    if (item.title === 'Reports' && settings && !settings.globalAnalytics) return false;
-    return true;
-  });
+  const menuItems = useMemo(() => {
+    const baseItems = user.role === 'SUPER_ADMIN' ? SUPER_ADMIN_ITEMS : COLLEGE_ADMIN_ITEMS;
+    return baseItems.filter(item => {
+      if (item.title === 'Doubts' && settings && !settings.globalDoubtSystem) return false;
+      if (item.title === 'Attendance' && settings && !settings.globalAttendance) return false;
+      if (item.title === 'Analytics' && settings && !settings.globalAnalytics) return false;
+      if (item.title === 'Reports' && settings && !settings.globalAnalytics) return false;
+      return true;
+    });
+  }, [user.role, settings]);
 
   const handleLogout = () => {
     logout();
@@ -214,8 +217,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const primaryColor = settings?.themeColor || '#3b82f6';
-  const primaryHSL = colorToHSL(primaryColor);
+  const primaryHSL = useMemo(() => {
+    const primaryColor = settings?.themeColor || '#3b82f6';
+    return colorToHSL(primaryColor);
+  }, [settings?.themeColor]);
 
   return (
     <SidebarProvider>
