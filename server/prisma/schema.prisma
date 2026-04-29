@@ -260,6 +260,8 @@ model Notice {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   content     String
+  priority    String   @default("Standard") // Standard, Critical, Info
+  audience    String   @default("Everyone") // Everyone, Students, Faculty, Staff
   
   collegeId   String   @db.ObjectId
   college     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)

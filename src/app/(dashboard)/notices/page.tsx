@@ -1,13 +1,12 @@
-
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Megaphone, Send, Users, ShieldAlert, Info, Clock, Trash2 } from 'lucide-react';
+import { Megaphone, Send, Users, ShieldAlert, Info, Clock, Trash2, Loader2, Sparkles, Bell, ArrowRight } from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -16,83 +15,163 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-
-const RECENT_NOTICES = [
-  { id: 1, title: 'Semester Exams Rescheduled', target: 'All Students', type: 'Critical', time: '1h ago' },
-  { id: 2, title: 'Cultural Fest Volunteers Needed', target: 'UG Students', type: 'Info', time: '5h ago' },
-  { id: 3, title: 'Holiday Announcement', target: 'Staff & Students', type: 'Standard', time: '1d ago' },
-];
+import api from '@/lib/axios';
+import { useToast } from '@/hooks/use-toast';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function NoticesPage() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [notices, setNotices] = useState<any[]>([]);
 
-  const handleBroadcast = () => {
+  // Form States
+  const [form, setForm] = useState({
+    title: '',
+    content: '',
+    audience: 'Everyone',
+    priority: 'Standard'
+  });
+
+  const fetchNotices = async () => {
+    try {
+      const res = await api.get('/api/notices');
+      setNotices(res.data);
+    } catch (err) {
+      toast({ title: "Fetch Error", description: "Failed to load recent broadcasts.", variant: "destructive" });
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotices();
+  }, []);
+
+  const handleBroadcast = async () => {
+    if (!form.title || !form.content) {
+      return toast({ title: "Validation Error", description: "Title and message are required.", variant: "destructive" });
+    }
+
     setLoading(true);
-    setTimeout(() => setLoading(false), 1500);
+    try {
+      await api.post('/api/notices', form);
+      toast({ 
+        title: "Broadcast Successful", 
+        description: "Your announcement has been sent to the target audience.",
+      });
+      setForm({ title: '', content: '', audience: 'Everyone', priority: 'Standard' });
+      fetchNotices();
+    } catch (err) {
+      toast({ title: "Broadcast Failed", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/api/notices/${id}`);
+      setNotices(notices.filter(n => n.id !== id));
+      toast({ title: "Notice Removed" });
+    } catch (err) {
+      toast({ title: "Delete Failed", variant: "destructive" });
+    }
   };
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-headline font-bold text-foreground">Broadcasting & Notices</h1>
-          <p className="text-muted-foreground">Send real-time announcements to students, faculty, or entire departments</p>
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex justify-between items-end">
+            <div>
+                <div className="flex items-center gap-2 text-indigo-600 font-bold mb-2">
+                    <Bell className="h-5 w-5" />
+                    <span className="text-sm tracking-widest uppercase">Communication Hub</span>
+                </div>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight">Broadcasting & Notices</h1>
+                <p className="text-slate-500 font-medium mt-1">Send real-time announcements to students, faculty, or entire departments</p>
+            </div>
+            <div className="hidden lg:flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                <div className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-indigo-600">
+                    <Megaphone className="h-5 w-5" />
+                </div>
+                <div className="pr-4">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-tighter">Live Status</p>
+                    <p className="text-sm font-bold text-slate-700">System Online</p>
+                </div>
+            </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Megaphone className="h-5 w-5 text-primary" /> Create Announcement
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-2 border-none shadow-2xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white/80 backdrop-blur-xl border border-white">
+            <CardHeader className="p-8 pb-4">
+              <CardTitle className="text-2xl font-bold flex items-center gap-3">
+                <Sparkles className="h-6 w-6 text-indigo-500" /> Draft Announcement
               </CardTitle>
-              <CardDescription>Draft and broadcast your message instantly</CardDescription>
+              <CardDescription className="text-slate-500 font-medium">Compose a message that will be broadcasted instantly.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-8 pt-4 space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-semibold">Title</label>
-                <Input placeholder="Enter notice title..." className="bg-secondary/30 border-none" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Audience</label>
-                  <Select defaultValue="all">
-                    <SelectTrigger className="bg-secondary/30 border-none">
-                      <SelectValue placeholder="Target Audience" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Everyone</SelectItem>
-                      <SelectItem value="students">Students Only</SelectItem>
-                      <SelectItem value="faculty">Faculty Only</SelectItem>
-                      <SelectItem value="cs">CS Department</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Priority</label>
-                  <Select defaultValue="standard">
-                    <SelectTrigger className="bg-secondary/30 border-none">
-                      <SelectValue placeholder="Priority Level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Standard / Info</SelectItem>
-                      <SelectItem value="medium">Important</SelectItem>
-                      <SelectItem value="high">Critical Alert</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Message Body</label>
-                <Textarea 
-                  placeholder="Write your announcement details here..." 
-                  className="min-h-[150px] bg-secondary/30 border-none"
+                <label className="text-sm font-bold text-slate-700 ml-1">Announcement Title</label>
+                <Input 
+                    value={form.title}
+                    onChange={(e) => setForm({...form, title: e.target.value})}
+                    placeholder="Enter a catchy and clear title..." 
+                    className="h-14 rounded-2xl bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-lg px-6" 
                 />
               </div>
-              <div className="flex justify-end pt-2">
-                <Button className="pulse-hover w-full sm:w-auto" onClick={handleBroadcast} disabled={loading}>
-                  {loading ? 'Broadcasting...' : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 ml-1">Target Audience</label>
+                  <Select value={form.audience} onValueChange={(v) => setForm({...form, audience: v})}>
+                    <SelectTrigger className="h-14 rounded-2xl bg-slate-50/50 border-slate-100 px-6 font-bold text-slate-700">
+                      <SelectValue placeholder="Target Audience" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-none shadow-2xl">
+                      <SelectItem value="Everyone">Everyone</SelectItem>
+                      <SelectItem value="Students">Students Only</SelectItem>
+                      <SelectItem value="Faculty">Faculty Only</SelectItem>
+                      <SelectItem value="Staff">Administrative Staff</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 ml-1">Urgency Level</label>
+                  <Select value={form.priority} onValueChange={(v) => setForm({...form, priority: v})}>
+                    <SelectTrigger className="h-14 rounded-2xl bg-slate-50/50 border-slate-100 px-6 font-bold text-slate-700">
+                      <SelectValue placeholder="Priority Level" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-none shadow-2xl">
+                      <SelectItem value="Standard">Standard / General</SelectItem>
+                      <SelectItem value="Info">Informational</SelectItem>
+                      <SelectItem value="Critical">Critical / Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 ml-1">Detailed Message</label>
+                <Textarea 
+                  value={form.content}
+                  onChange={(e) => setForm({...form, content: e.target.value})}
+                  placeholder="Provide all necessary details here..." 
+                  className="min-h-[180px] rounded-[2rem] bg-slate-50/50 border-slate-100 p-6 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                />
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button 
+                    className="w-full sm:w-auto h-14 px-10 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black text-lg shadow-xl shadow-slate-200 transition-all active:scale-95 flex gap-3" 
+                    onClick={handleBroadcast} 
+                    disabled={loading}
+                >
+                  {loading ? (
                     <>
-                      <Send className="h-4 w-4 mr-2" /> Send Announcement
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Broadcasting...
+                    </>
+                  ) : (
+                    <>
+                      Send Announcement <ArrowRight className="h-5 w-5" />
                     </>
                   )}
                 </Button>
@@ -100,27 +179,55 @@ export default function NoticesPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Recent Broadcasts</h3>
-            {RECENT_NOTICES.map((notice) => (
-              <Card key={notice.id} className="border-none shadow-sm group">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <Badge variant={notice.type === 'Critical' ? 'destructive' : 'secondary'} className="text-[10px]">
-                      {notice.type}
-                    </Badge>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                  </div>
-                  <h4 className="font-bold text-sm mb-1">{notice.title}</h4>
-                  <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {notice.target}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {notice.time}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">History & Logs</h3>
+                <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 border-none font-black text-[10px]">{notices.length} Sent</Badge>
+            </div>
+            
+            <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                {fetching ? (
+                    Array(3).fill(0).map((_, i) => (
+                        <div key={i} className="h-32 w-full bg-slate-50 rounded-3xl animate-pulse border border-slate-100" />
+                    ))
+                ) : notices.length === 0 ? (
+                    <div className="py-20 text-center bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                        <Megaphone className="h-10 w-10 mx-auto text-slate-300 mb-3 opacity-50" />
+                        <p className="text-slate-400 font-bold text-sm">No recent broadcasts</p>
+                    </div>
+                ) : (
+                    notices.map((notice) => (
+                        <Card key={notice.id} className="border-none shadow-lg shadow-slate-200/40 group hover:shadow-xl transition-all rounded-3xl overflow-hidden bg-white">
+                            <CardContent className="p-6">
+                                <div className="flex justify-between items-start mb-3">
+                                    <Badge className={`text-[9px] font-black uppercase tracking-widest border-none px-3 py-1 rounded-full ${
+                                        notice.priority === 'Critical' ? 'bg-red-100 text-red-600' : 
+                                        notice.priority === 'Info' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                        {notice.priority}
+                                    </Badge>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => handleDelete(notice.id)}
+                                        className="h-8 w-8 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <h4 className="font-bold text-slate-900 leading-tight mb-2">{notice.title}</h4>
+                                <p className="text-xs text-slate-500 line-clamp-2 font-medium mb-4">
+                                    {notice.content}
+                                </p>
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-50 text-[10px] font-bold">
+                                    <span className="flex items-center gap-1.5 text-slate-400"><Users className="h-3.5 w-3.5" /> {notice.audience}</span>
+                                    <span className="flex items-center gap-1.5 text-slate-400"><Clock className="h-3.5 w-3.5" /> {formatDistanceToNow(new Date(notice.createdAt))} ago</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))
+                )}
+            </div>
           </div>
         </div>
       </div>

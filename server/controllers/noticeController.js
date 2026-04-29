@@ -2,7 +2,7 @@ const prisma = require('../config/prisma');
 
 exports.createNotice = async (req, res) => {
   try {
-    const { title, content, targetRoles, targetDepts } = req.body;
+    const { title, content, priority, audience, targetRoles, targetDepts } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ message: "Title and content are required." });
@@ -20,6 +20,8 @@ exports.createNotice = async (req, res) => {
       data: {
         title,
         content,
+        priority: priority || "Standard",
+        audience: audience || "Everyone",
         collegeId,
         targetRoles: targetRoles || [],
         targetDepts: targetDepts || []
@@ -56,5 +58,15 @@ exports.getNotices = async (req, res) => {
   } catch (error) {
     console.error('Fetch Notices Error:', error);
     res.status(500).json({ message: "Internal server error fetching notices" });
+  }
+};
+
+exports.deleteNotice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.notice.delete({ where: { id } });
+    res.status(200).json({ message: "Notice removed" });
+  } catch (error) {
+    res.status(500).json({ message: "Delete failed" });
   }
 };
