@@ -101,6 +101,37 @@ exports.createFeeStructure = async (req, res) => {
     }
 };
 
+exports.updateFeeStructure = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, amount, courseId, description } = req.body;
+        const updated = await prisma.feeStructure.update({
+            where: { id },
+            data: { 
+                name, 
+                amount: amount ? parseFloat(amount) : undefined, 
+                courseId, 
+                description 
+            }
+        });
+        res.status(200).json(updated);
+    } catch (error) {
+        console.error('Update Fee Structure Error:', error);
+        res.status(500).json({ message: "Update failed" });
+    }
+};
+
+exports.deleteFeeStructure = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.feeStructure.delete({ where: { id } });
+        res.status(200).json({ message: "Deleted" });
+    } catch (error) {
+        console.error('Delete Fee Structure Error:', error);
+        res.status(500).json({ message: "Delete failed" });
+    }
+};
+
 exports.getFinanceStats = async (req, res) => {
     try {
         let collegeId = req.user?.college || req.user?.collegeId;

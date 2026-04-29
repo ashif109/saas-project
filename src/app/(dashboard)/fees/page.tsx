@@ -63,6 +63,8 @@ export default function FeesPage() {
     description: ''
   });
 
+  const [editingStructure, setEditingStructure] = useState<any>(null);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -122,14 +124,32 @@ export default function FeesPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post('/api/finance/fee-structures', structureForm);
-      toast({ title: "Structure Saved", description: "New fee model has been published." });
+      if (editingStructure) {
+        await api.put(`/api/finance/fee-structures/${editingStructure.id}`, structureForm);
+        toast({ title: "Structure Updated", description: "Fee model has been updated." });
+      } else {
+        await api.post('/api/finance/fee-structures', structureForm);
+        toast({ title: "Structure Saved", description: "New fee model has been published." });
+      }
       setOpenStructure(false);
+      setEditingStructure(null);
+      setStructureForm({ name: '', amount: '', courseId: '', description: '' });
       fetchData();
     } catch (err) {
       toast({ title: "Error", description: "Failed to save structure.", variant: "destructive" });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const deleteStructure = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this fee structure?")) return;
+    try {
+        await api.delete(`/api/finance/fee-structures/${id}`);
+        toast({ title: "Deleted", description: "Fee structure removed." });
+        fetchData();
+    } catch (err) {
+        toast({ title: "Error", description: "Failed to delete.", variant: "destructive" });
     }
   };
 
@@ -218,8 +238,11 @@ export default function FeesPage() {
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label>Fee Category</Label>
-                        <Select onValueChange={(v) => setPaymentForm({...paymentForm, feeStructureId: v})}>
+                        <Label>Fee Structure / Category</Label>
+                        <Select onValueChange={(v) => {
+                            const structure = feeStructures.find(f => f.id === v);
+                            setPaymentForm({...paymentForm, feeStructureId: v, amount: structure ? structure.amount.toString() : paymentForm.amount});
+                        }}>
                             <SelectTrigger className="h-11"><SelectValue placeholder="Select Category" /></SelectTrigger>
                             <SelectContent>
                                 {feeStructures.map(f => <SelectItem key={f.id} value={f.id}>{f.name} (₹{f.amount})</SelectItem>)}
@@ -260,7 +283,7 @@ export default function FeesPage() {
                 <History className="w-4 h-4 mr-2" /> Recent Transactions
             </TabsTrigger>
             <TabsTrigger value="structures" className="rounded-xl px-8 font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
-                <Receipt className="w-4 h-4 mr-2" /> Fee Structures
+                <Receipt className="w-4 h-4 mr-2" /> Fee Categories & Structures
             </TabsTrigger>
           </TabsList>
 
@@ -356,16 +379,16 @@ export default function FeesPage() {
           <TabsContent value="structures" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Standard Fee Models</h2>
-                    <p className="text-slate-500">Configure global fee templates for courses and services</p>
+                    <h2 className="text-2xl font-bold text-slate-900">Fee Categories & Models</h2>
+                    <p className="text-slate-500">Configure global fee categories and templates for courses</p>
                 </div>
-                <Dialog open={openStructure} onOpenChange={setOpenStructure}>
+                <Dialog open={openStructure} onOpenChange={(val) => { setOpenStructure(val); if(!val) { setEditingStructure(null); setStructureForm({ name: '', amount: '', courseId: '', description: '' }); } }}>
                     <DialogTrigger asChild>
-                        <Button className="bg-slate-900 hover:bg-slate-800 rounded-2xl h-11 px-6 font-bold shadow-lg shadow-slate-200"><Plus className="h-4 w-4 mr-2" /> Define New Structure</Button>
+                        <Button className="bg-slate-900 hover:bg-slate-800 rounded-2xl h-11 px-6 font-bold shadow-lg shadow-slate-200"><Plus className="h-4 w-4 mr-2" /> Define New Category</Button>
                     </DialogTrigger>
                     <DialogContent className="rounded-3xl border-none shadow-2xl">
                         <form onSubmit={handleStructureSubmit}>
-                            <DialogHeader><DialogTitle className="text-2xl font-bold">New Fee Template</DialogTitle></DialogHeader>
+                            <DialogHeader><DialogTitle className="text-2xl font-bold">{editingStructure ? 'Edit Category' : 'New Fee Category'}</DialogTitle></DialogHeader>
                             <div className="grid gap-6 py-6">
                                 <div className="space-y-2">
                                     <Label>Structure Name</Label>
@@ -407,7 +430,10 @@ export default function FeesPage() {
                       </div>
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end"><DropdownMenuItem><Edit className="h-4 w-4 mr-2" /> Edit</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" /> Delete</DropdownMenuItem></DropdownMenuContent>
+                          <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setEditingStructure(fee); setStructureForm({ name: fee.name, amount: fee.amount.toString(), courseId: fee.courseId || '', description: fee.description || '' }); setOpenStructure(true); }}><Edit className="h-4 w-4 mr-2" /> Edit</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => deleteStructure(fee.id)}><Trash2 className="h-4 w-4 mr-2" /> Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                     <h3 className="font-bold text-xl text-slate-900 mb-2">{fee.name}</h3>
