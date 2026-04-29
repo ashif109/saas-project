@@ -96,6 +96,7 @@ model College {
   transactions    Transaction[]
   auditLogs       AuditLog[] @relation("CollegeAuditLogs")
   admissionLeads  AdmissionLead[]
+  scholarships    Scholarship[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -200,6 +201,7 @@ model StudentProfile {
   batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   transactions   Transaction[]
+  scholarshipApplications ScholarshipApplication[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -359,4 +361,39 @@ model Transaction {
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model Scholarship {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   // e.g. "Merit Excellence Award"
+  description String?
+  amount      Float
+  type        String   // "Full Tuition", "Fixed Amount", "Percentage"
+  status      String   @default("ACTIVE") // ACTIVE, CLOSED
+  
+  collegeId   String   @db.ObjectId
+  college     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  applications ScholarshipApplication[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ScholarshipApplication {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId      String   @db.ObjectId
+  student        StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  scholarshipId  String   @db.ObjectId
+  scholarship    Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  
+  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  appliedDate    DateTime @default(now())
+  notes          String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, scholarshipId])
 }

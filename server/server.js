@@ -59,6 +59,7 @@ app.use('/api/notices', require('./routes/noticeRoutes'));
 app.use('/api/timetable', require('./routes/timetableRoutes'));
 app.use('/api/setup', require('./routes/setupRoutes'));
 app.use('/api/finance', require('./routes/financeRoutes'));
+app.use('/api/scholarships', require('./routes/scholarshipRoutes'));
 
 // --- Error Handling Middleware ---
 app.use(notFound);
