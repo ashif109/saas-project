@@ -192,9 +192,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isAuthenticated, router, settings, fetchSettings]);
 
-  if (!mounted || !user) return null;
 
   const menuItems = useMemo(() => {
+    if (!user) return [];
     const baseItems = user.role === 'SUPER_ADMIN' ? SUPER_ADMIN_ITEMS : COLLEGE_ADMIN_ITEMS;
     return baseItems.filter(item => {
       if (item.title === 'Doubts' && settings && !settings.globalDoubtSystem) return false;
@@ -203,7 +203,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (item.title === 'Reports' && settings && !settings.globalAnalytics) return false;
       return true;
     });
-  }, [user.role, settings]);
+  }, [user?.role, settings]);
 
   const handleLogout = () => {
     logout();
@@ -221,6 +221,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const primaryColor = settings?.themeColor || '#3b82f6';
     return colorToHSL(primaryColor);
   }, [settings?.themeColor]);
+
+  if (!mounted || !user) return null;
 
   return (
     <SidebarProvider>
