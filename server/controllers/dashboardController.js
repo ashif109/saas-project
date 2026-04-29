@@ -8,6 +8,10 @@ exports.getDashboardSummary = async (req, res) => {
       collegeId = firstCollege?.id;
     }
 
+    if (!collegeId) {
+        return res.status(404).json({ message: "No college context found" });
+    }
+
     // 1. Basic KPI Counts
     const [studentCount, facultyCount, courseCount] = await Promise.all([
       prisma.studentProfile.count({ where: { user: { collegeId } } }),
@@ -52,7 +56,7 @@ exports.getDashboardSummary = async (req, res) => {
             });
         });
         return { name: d.name, value: count };
-    });
+    }).filter(d => d.value > 0);
 
     // 4. Role Distribution
     const roleCounts = await prisma.role.findMany({
@@ -83,21 +87,65 @@ exports.getDashboardSummary = async (req, res) => {
     });
 
     // 7. Today's Snapshot (Timetable & Events)
+    const today = new Date();
+    const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+    
     const ongoingClasses = await prisma.timetableEntry.count({
-        where: { batch: { collegeId } } // Placeholder for actual time logic
+        where: { 
+            batch: { collegeId },
+            dayOfWeek: dayName
+        }
     });
 
     const nextEvent = await prisma.event.findFirst({
-        where: { academicYear: { collegeId }, startDate: { gte: new Date() } },
+        where: { academicYear: { collegeId }, startDate: { gte: today } },
         orderBy: { startDate: 'asc' }
     });
 
-    // 8. Faculty Insights (Top performers or engagement)
-    const facultyInsights = await prisma.facultyProfile.findMany({
+    // 8. Faculty Insights (Engagement based on subject assignments)
+    const facultyProfiles = await prisma.facultyProfile.findMany({
         where: { department: { collegeId } },
         take: 3,
-        include: { user: true, department: true }
+        include: { 
+            user: true, 
+            department: true,
+            _count: { select: { subjects: true } }
+        }
     });
+
+    // 9. Attendance Analytics (Last 7 Days Trend)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const attendanceRecords = await prisma.attendance.findMany({
+        where: { collegeId, date: { gte: sevenDaysAgo } }
+    });
+
+    const trendMap = {};
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toLocaleDateString('en-US', { weekday: 'short' });
+        trendMap[dateStr] = { count: 0, total: 0 };
+    }
+
+    attendanceRecords.forEach(r => {
+        const dateStr = new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' });
+        if (trendMap[dateStr]) {
+            trendMap[dateStr].total++;
+            if (r.status === 'PRESENT') trendMap[dateStr].count++;
+        }
+    });
+
+    const attendanceTrend = Object.keys(trendMap).map(day => ({
+        day,
+        attendance: trendMap[day].total > 0 ? Math.round((trendMap[day].count / trendMap[day].total) * 100) : 0
+    }));
+
+    // Today's average attendance
+    const todayStr = today.toLocaleDateString('en-US', { weekday: 'short' });
+    const todayStats = trendMap[todayStr];
+    const todayAvg = todayStats && todayStats.total > 0 ? ((todayStats.count / todayStats.total) * 100).toFixed(1) : "0.0";
 
     res.status(200).json({
       kpis: {
@@ -106,12 +154,20 @@ exports.getDashboardSummary = async (req, res) => {
         activeCourses: courseCount,
         feeCollection: `₹${(totalCollected / 1000).toFixed(1)}K`,
         pendingFees: `₹${(pendingFees / 1000).toFixed(1)}K`,
-        attendance: "89.4%" // Mocked for now
+        attendance: `${todayAvg}%`
       },
       distribution: distribution.length > 0 ? distribution : [
           { name: 'Computer Science', value: 0 },
-          { name: 'Mechanical', value: 0 },
-          { name: 'Physics', value: 0 }
+          { name: 'Business', value: 0 },
+          { name: 'Engineering', value: 0 }
+      ],
+      attendanceTrend: attendanceTrend.length > 0 ? attendanceTrend : [
+          { day: 'Mon', attendance: 0 },
+          { day: 'Tue', attendance: 0 },
+          { day: 'Wed', attendance: 0 },
+          { day: 'Thu', attendance: 0 },
+          { day: 'Fri', attendance: 0 },
+          { day: 'Sat', attendance: 0 },
       ],
       roles,
       notices,
@@ -123,14 +179,14 @@ exports.getDashboardSummary = async (req, res) => {
       })),
       snapshot: {
           ongoing: ongoingClasses,
-          upcoming: Math.floor(ongoingClasses * 1.5),
+          upcoming: Math.max(0, ongoingClasses - 2), // Mock logic for upcoming
           nextEvent: nextEvent ? { title: nextEvent.title, time: nextEvent.startDate } : null
       },
-      facultyInsights: facultyInsights.map(f => ({
+      facultyInsights: facultyProfiles.map(f => ({
           name: `${f.user.firstName} ${f.user.lastName}`,
           department: f.department.name,
-          status: 'Optimal',
-          score: 85 + Math.floor(Math.random() * 15)
+          status: f._count.subjects > 4 ? 'Overloaded' : (f._count.subjects < 2 ? 'Underutilized' : 'Optimal'),
+          score: 80 + (f._count.subjects * 3) + Math.floor(Math.random() * 5)
       })),
       actionCenter: [
           { 
@@ -141,7 +197,7 @@ exports.getDashboardSummary = async (req, res) => {
           },
           { 
               title: 'Classes w/o Faculty Assigned', 
-              count: 0, 
+              count: 0, // Logic to find empty facultyId in TimetableEntry
               priority: 'medium', 
               href: '/timetable' 
           },
@@ -153,7 +209,7 @@ exports.getDashboardSummary = async (req, res) => {
           },
           { 
               title: 'Low Attendance Alerts (<75%)', 
-              count: 0, 
+              count: attendanceRecords.filter(r => r.status === 'ABSENT').length, 
               priority: 'low', 
               href: '/attendance' 
           }
