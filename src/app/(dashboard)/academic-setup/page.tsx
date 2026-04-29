@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Calendar, Layers, BookOpen, Clock, Plus, Settings2, Loader2, Info, MoreVertical, Edit2, Trash2, GraduationCap, Building2 } from 'lucide-react';
+import { Calendar, Layers, BookOpen, Clock, Plus, Settings2, Loader2, Info, MoreVertical, Edit2, Trash2, GraduationCap, Building2, Book } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -44,12 +44,14 @@ export default function AcademicSetupPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
 
   // Dialog State
   const [openYearDialog, setOpenYearDialog] = useState(false);
   const [openCourseDialog, setOpenCourseDialog] = useState(false);
   const [openBatchDialog, setOpenBatchDialog] = useState(false);
+  const [openSubjectDialog, setOpenSubjectDialog] = useState(false);
   
   // Edit State
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -58,10 +60,12 @@ export default function AcademicSetupPage() {
   const [yearForm, setYearForm] = useState({ name: '', startDate: '', endDate: '' });
   const [courseForm, setCourseForm] = useState({ name: '', duration: '4', departmentId: '' });
   const [batchForm, setBatchForm] = useState({ name: '', courseId: '', academicYearId: '' });
+  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', credits: '3', courseId: '', semester: '1' });
 
   const tabs = [
     { id: 'years', label: 'Academic Years', icon: Calendar },
     { id: 'courses', label: 'Courses & Degrees', icon: BookOpen },
+    { id: 'subjects', label: 'Subjects & Curriculum', icon: Book },
     { id: 'batches', label: 'Batch Management', icon: Layers },
     { id: 'terms', label: 'Semesters / Terms', icon: Clock },
   ];
@@ -69,16 +73,18 @@ export default function AcademicSetupPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [yrs, crs, btc, dpt] = await Promise.all([
+      const [yrs, crs, btc, dpt, sbj] = await Promise.all([
         api.get('/api/academic-years'),
         api.get('/api/setup/courses'),
         api.get('/api/setup/batches'),
-        api.get('/api/departments')
+        api.get('/api/departments'),
+        api.get('/api/setup/subjects')
       ]);
       setAcademicYears(yrs.data);
       setCourses(crs.data);
       setBatches(btc.data);
       setDepartments(dpt.data);
+      setSubjects(sbj.data);
     } catch (err) {
       console.error(err);
       toast({ title: "Error", description: "Failed to load data.", variant: "destructive" });
@@ -149,6 +155,25 @@ export default function AcademicSetupPage() {
     }
   };
 
+  const handleSubjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (editingItem) {
+        await api.put(`/api/setup/subjects/${editingItem.id}`, subjectForm);
+      } else {
+        await api.post('/api/setup/subjects', subjectForm);
+      }
+      setOpenSubjectDialog(false);
+      fetchData();
+      toast({ title: "Success", description: "Subject saved successfully." });
+    } catch (err) {
+      toast({ title: "Error", description: "Action failed.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const deleteItem = async (type: string, id: string) => {
     if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
     try {
@@ -189,6 +214,11 @@ export default function AcademicSetupPage() {
             {activeTab === 'batches' && (
                 <Button onClick={() => { setEditingItem(null); setBatchForm({ name: '', courseId: '', academicYearId: '' }); setOpenBatchDialog(true); }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 px-6 py-6 rounded-2xl font-bold">
                     <Plus className="mr-2 h-5 w-5" /> Create Batch
+                </Button>
+            )}
+            {activeTab === 'subjects' && (
+                <Button onClick={() => { setEditingItem(null); setSubjectForm({ name: '', code: '', credits: '3', courseId: '', semester: '1' }); setOpenSubjectDialog(true); }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 px-6 py-6 rounded-2xl font-bold">
+                    <Plus className="mr-2 h-5 w-5" /> Add Subject
                 </Button>
             )}
           </div>
@@ -276,6 +306,49 @@ export default function AcademicSetupPage() {
             </DialogContent>
         </Dialog>
 
+        <Dialog open={openSubjectDialog} onOpenChange={setOpenSubjectDialog}>
+            <DialogContent className="border-none shadow-2xl">
+                <form onSubmit={handleSubjectSubmit}>
+                    <DialogHeader><DialogTitle className="text-2xl font-bold">{editingItem ? 'Edit Subject' : 'New Subject'}</DialogTitle></DialogHeader>
+                    <div className="grid gap-6 py-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Subject Name</Label>
+                                <Input placeholder="e.g. Data Structures" required value={subjectForm.name} onChange={(e) => setSubjectForm({...subjectForm, name: e.target.value})} className="h-11" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Subject Code</Label>
+                                <Input placeholder="e.g. CS101" required value={subjectForm.code} onChange={(e) => setSubjectForm({...subjectForm, code: e.target.value})} className="h-11" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Credits</Label>
+                                <Input type="number" required value={subjectForm.credits} onChange={(e) => setSubjectForm({...subjectForm, credits: e.target.value})} className="h-11" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Semester</Label>
+                                <Select value={subjectForm.semester} onValueChange={(v) => setSubjectForm({...subjectForm, semester: v})}>
+                                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(s => <SelectItem key={s} value={s.toString()}>Semester {s}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Course</Label>
+                            <Select value={subjectForm.courseId} onValueChange={(v) => setSubjectForm({...subjectForm, courseId: v})}>
+                                <SelectTrigger className="h-11"><SelectValue placeholder="Select Course" /></SelectTrigger>
+                                <SelectContent>{courses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter><Button type="submit" disabled={submitting} className="bg-blue-600 w-full">Save Subject</Button></DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
           <div className="flex overflow-x-auto border-b border-slate-100 bg-slate-50/30 px-6 pt-6 gap-2">
             {tabs.map(tab => (
@@ -339,6 +412,42 @@ export default function AcademicSetupPage() {
                                 </CardContent>
                             </Card>
                         ))}
+                    </div>
+                )}
+
+                {activeTab === 'subjects' && (
+                    <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-slate-50/50">
+                                <TableRow>
+                                    <TableHead className="pl-6">Subject</TableHead>
+                                    <TableHead>Code</TableHead>
+                                    <TableHead>Course</TableHead>
+                                    <TableHead>Semester</TableHead>
+                                    <TableHead>Credits</TableHead>
+                                    <TableHead className="text-right pr-6">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {subjects.length === 0 ? (
+                                    <TableRow><TableCell colSpan={6} className="text-center py-10 text-slate-400">No subjects defined.</TableCell></TableRow>
+                                ) : subjects.map(subject => (
+                                    <TableRow key={subject.id} className="group">
+                                        <TableCell className="pl-6 font-bold text-slate-900">{subject.name}</TableCell>
+                                        <TableCell><Badge variant="outline" className="font-mono">{subject.code}</Badge></TableCell>
+                                        <TableCell>{subject.course?.name}</TableCell>
+                                        <TableCell>Semester {subject.semester}</TableCell>
+                                        <TableCell>{subject.credits} Credits</TableCell>
+                                        <TableCell className="text-right pr-6">
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => { setEditingItem(subject); setSubjectForm({ name: subject.name, code: subject.code, credits: subject.credits.toString(), courseId: subject.courseId, semester: subject.semester.toString() }); setOpenSubjectDialog(true); }} className="text-slate-400 hover:text-blue-600"><Edit2 className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" onClick={() => deleteItem('subject', subject.id)} className="text-slate-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </div>
                 )}
 
