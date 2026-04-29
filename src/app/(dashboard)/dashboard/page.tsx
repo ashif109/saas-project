@@ -70,16 +70,16 @@ export default function DashboardPage() {
 
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           <div className="lg:col-span-8 flex flex-col h-full">
-            <ActionCenter />
+            <ActionCenter data={data?.actionCenter} />
           </div>
           <div className="lg:col-span-4 flex flex-col gap-5">
-            <TodaySnapshot />
+            <TodaySnapshot data={data?.snapshot} />
             <RoleOverviewWidget data={data?.roles} />
           </div>
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          <FacultyInsights />
+          <FacultyInsights data={data?.facultyInsights} />
           <NoticePanel data={data?.notices} />
           <RecentActivity data={data?.activity} />
         </section>

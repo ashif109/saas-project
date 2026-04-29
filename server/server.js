@@ -56,6 +56,8 @@ app.use('/api/students', require('./routes/studentRoutes'));
 app.use('/api/faculty', require('./routes/facultyRoutes'));
 app.use('/api/departments', require('./routes/departmentRoutes'));
 app.use('/api/academic-years', require('./routes/academicRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/notices', require('./routes/noticeRoutes'));
 app.use('/api/timetable', require('./routes/timetableRoutes'));
 app.use('/api/setup', require('./routes/setupRoutes'));

@@ -97,6 +97,7 @@ model College {
   auditLogs       AuditLog[] @relation("CollegeAuditLogs")
   admissionLeads  AdmissionLead[]
   scholarships    Scholarship[]
+  attendances     Attendance[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -148,6 +149,7 @@ model Subject {
 
   facultyAssignments FacultySubject[]
   timetables         TimetableEntry[]
+  attendances        Attendance[]
 
   createdAt   DateTime   @default(now())
   updatedAt   DateTime @updatedAt
@@ -184,6 +186,7 @@ model Batch {
 
   students       StudentProfile[]
   timetables     TimetableEntry[]
+  attendances    Attendance[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -202,6 +205,7 @@ model StudentProfile {
 
   transactions   Transaction[]
   scholarshipApplications ScholarshipApplication[]
+  attendances    Attendance[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -398,4 +402,27 @@ model ScholarshipApplication {
   updatedAt      DateTime @updatedAt
 
   @@unique([studentId, scholarshipId])
+}
+
+model Attendance {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  date           DateTime
+  status         String   // PRESENT, ABSENT, LATE
+  
+  studentId      String   @db.ObjectId
+  student        StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  subjectId      String   @db.ObjectId
+  subject        Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  batchId        String   @db.ObjectId
+  batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  collegeId      String   @db.ObjectId
+  college        College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, subjectId, date])
 }
