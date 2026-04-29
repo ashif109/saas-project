@@ -44,6 +44,7 @@ app.get('/api', (req, res) => {
 });
 
 // --- API Routes ---
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/colleges', require('./routes/collegeRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));

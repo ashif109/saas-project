@@ -1,51 +1,53 @@
 import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Megaphone, Plus, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
-const notices = [
-  { id: 1, title: 'End Semester Examination Schedule published', target: 'All Students', date: '2 hours ago' },
-  { id: 2, title: 'Faculty Development Program Registration', target: 'Faculty', date: '1 day ago' },
-  { id: 3, title: 'Campus Maintenance Notice - Block B', target: 'Everyone', date: '2 days ago' },
-];
-
-export function NoticePanel() {
+export function NoticePanel({ data }: { data?: any[] }) {
   return (
-    <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-          <Megaphone size={18} className="text-blue-500" />
-          Notice Board
-        </h3>
-        <Link 
-          href="/notices/new" 
-          className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
-        >
-          <Plus size={16} />
-        </Link>
-      </div>
-      
-      <div className="space-y-4 flex-1">
-        {notices.map((notice) => (
-          <div key={notice.id} className="group cursor-pointer">
-            <h4 className="text-sm font-medium text-slate-900 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
-              {notice.title}
-            </h4>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                {notice.target}
-              </span>
-              <span className="text-xs text-slate-400">{notice.date}</span>
+    <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden bg-white">
+      <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Megaphone size={18} />
             </div>
+            <CardTitle className="text-xl font-bold">Notice Board</CardTitle>
+        </div>
+        <Link href="/notices">
+            <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9 text-slate-400 hover:text-indigo-600">
+                <Plus size={20} />
+            </Button>
+        </Link>
+      </CardHeader>
+      <CardContent className="space-y-4 py-4">
+        {(!data || data.length === 0) ? (
+            <div className="py-10 text-center">
+                <p className="text-slate-400 font-bold text-sm">No recent notices published.</p>
+            </div>
+        ) : data.map((notice, i) => (
+          <div key={i} className="group cursor-pointer">
+            <h4 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors leading-tight">{notice.title}</h4>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="secondary" className="bg-slate-100 text-[9px] font-black uppercase tracking-widest text-slate-500 py-0.5 px-2 border-none rounded-full">
+                {notice.audience}
+              </Badge>
+              <span className="text-[10px] font-bold text-slate-400">
+                {formatDistanceToNow(new Date(notice.createdAt))} ago
+              </span>
+            </div>
+            {i !== data.length - 1 && <div className="h-px w-full bg-slate-50 mt-4" />}
           </div>
         ))}
-      </div>
-
-      <Link 
-        href="/notices" 
-        className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-      >
-        View All Notices <ArrowRight size={14} />
-      </Link>
-    </div>
+        
+        <Link href="/notices" className="block pt-2">
+          <Button variant="ghost" className="w-full text-indigo-600 font-black text-xs uppercase tracking-widest hover:bg-indigo-50 rounded-xl flex items-center justify-center gap-2">
+            View All Notices <ArrowRight size={14} />
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
   );
 }

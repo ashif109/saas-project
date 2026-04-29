@@ -1,39 +1,61 @@
 import React from 'react';
-import { UserPlus, CreditCard, LayoutTemplate, ShieldCheck } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { UserPlus, CreditCard, Calendar, ShieldCheck, Clock } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
-const activities = [
-  { id: 1, type: 'registration', title: 'New Student Registered', desc: 'Rahul Sharma (Comp. Sci)', time: '10m ago', icon: UserPlus, color: 'text-blue-500' },
-  { id: 2, type: 'fee', title: 'Fee Payment Received', desc: '$1,200 via Stripe', time: '1h ago', icon: CreditCard, color: 'text-emerald-500' },
-  { id: 3, type: 'timetable', title: 'Timetable Updated', desc: 'Fall 2024 Schedule', time: '3h ago', icon: LayoutTemplate, color: 'text-indigo-500' },
-  { id: 4, type: 'role', title: 'Role Assigned', desc: 'Dr. Smith assigned as HOD', time: 'Yesterday', icon: ShieldCheck, color: 'text-amber-500' },
-];
+export function RecentActivity({ data }: { data?: any[] }) {
+  const getIcon = (action: string) => {
+    if (action.includes('ENROLL')) return UserPlus;
+    if (action.includes('PAYMENT') || action.includes('FEE')) return CreditCard;
+    if (action.includes('TIMETABLE')) return Calendar;
+    if (action.includes('ROLE')) return ShieldCheck;
+    return Clock;
+  };
 
-export function RecentActivity() {
+  const getIconColor = (action: string) => {
+    if (action.includes('ENROLL')) return 'text-indigo-500 bg-indigo-50';
+    if (action.includes('PAYMENT')) return 'text-emerald-500 bg-emerald-50';
+    if (action.includes('TIMETABLE')) return 'text-blue-500 bg-blue-50';
+    if (action.includes('ROLE')) return 'text-orange-500 bg-orange-50';
+    return 'text-slate-500 bg-slate-50';
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-      <h3 className="font-semibold text-slate-900 dark:text-white mb-6">Recent Activity</h3>
-      
-      <div className="space-y-6 flex-1 relative">
-        {/* Continuous vertical line */}
-        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-800 z-0" />
+    <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden bg-white">
+      <CardHeader>
+        <CardTitle className="text-xl font-bold">Recent Activity</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6 relative">
+        <div className="absolute left-10 top-10 bottom-24 w-0.5 bg-slate-50" />
         
-        {activities.map((activity) => (
-          <div key={activity.id} className="flex gap-4 relative z-10">
-            <div className="w-6 h-6 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 mt-0.5">
-              <activity.icon size={10} className={activity.color} />
+        {(!data || data.length === 0) ? (
+            <div className="py-10 text-center">
+                <p className="text-slate-400 font-bold text-sm">No activity logs found.</p>
             </div>
-            <div>
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-200">{activity.title}</p>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{activity.desc}</p>
-              <p className="text-[10px] text-slate-400 mt-1">{activity.time}</p>
+        ) : data.map((item, i) => {
+          const Icon = getIcon(item.action);
+          const colors = getIconColor(item.action);
+          return (
+            <div key={i} className="flex gap-4 relative z-10">
+              <div className={`h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center shadow-sm ${colors}`}>
+                <Icon size={18} strokeWidth={2.5} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800 leading-snug">{item.action.replace(/_/g, ' ')}</p>
+                <p className="text-[11px] font-medium text-slate-400 mt-0.5">{item.user}</p>
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter mt-1">
+                    {formatDistanceToNow(new Date(item.time))} ago
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      
-      <button className="w-full mt-6 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
-        View All Logs
-      </button>
-    </div>
+          );
+        })}
+
+        <Button variant="outline" className="w-full mt-2 py-6 rounded-2xl border-slate-100 font-bold text-slate-500 hover:bg-slate-50 transition-all">
+          View All Logs
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
