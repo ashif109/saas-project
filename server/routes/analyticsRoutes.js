@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getSystemStats } = require('../controllers/analyticsController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { getInstitutionalReports } = require('../controllers/analyticsController');
+const { protect } = require('../middleware/authMiddleware');
 
-// Analytics routes
-router.get('/system-stats', protect, authorize('SUPER_ADMIN'), getSystemStats);
+router.get('/institutional', protect, getInstitutionalReports);
 
 module.exports = router;
