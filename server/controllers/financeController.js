@@ -14,11 +14,25 @@ exports.createTransaction = async (req, res) => {
       collegeId = firstCollege?.id;
     }
 
+    // Find the student profile first to ensure we have the correct ID (StudentProfile.id, not User.id)
+    const student = await prisma.studentProfile.findFirst({
+        where: {
+            OR: [
+                { id: studentId },
+                { userId: studentId }
+            ]
+        }
+    });
+
+    if (!student) {
+        return res.status(404).json({ message: "Student record not found. Please ensure the student has a profile." });
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         amount: parseFloat(amount),
-        studentId,
-        feeStructureId: feeStructureId || null,
+        studentId: student.id,
+        feeStructureId: feeStructureId && feeStructureId !== "" ? feeStructureId : null,
         paymentMethod: paymentMethod || "Cash",
         type: type || "Tuition",
         status: status || "PAID",
