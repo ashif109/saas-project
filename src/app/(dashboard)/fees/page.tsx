@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CreditCard, DollarSign, AlertCircle, CheckCircle2, Plus, Settings2, Trash2, Edit, Loader2, Download, Search, Filter, History, Landmark, Receipt, FileText } from 'lucide-react';
+import { CreditCard, DollarSign, AlertCircle, CheckCircle2, Plus, Settings2, Trash2, Edit, Loader2, Download, Search, Filter, History, Landmark, Receipt, FileText, MoreVertical } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
