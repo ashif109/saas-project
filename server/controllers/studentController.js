@@ -342,3 +342,29 @@ exports.updateStudent = asyncHandler(async (req, res) => {
       name: `${updatedUser.firstName} ${updatedUser.lastName}`,
       email: updatedUser.email,
       phone: updatedUser.phone || '',
+      department: deptName,
+      semester: '1st Semester',
+      status: updatedUser.isActive ? 'Active' : 'Suspended'
+    }
+  });
+});
+
+exports.resendWelcomeEmail = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { studentProfile: true, college: true }
+  });
+
+  if (!user || !user.studentProfile) {
+    return res.status(404).json({ message: "Student not found." });
+  }
+
+  const defaultPassword = 'Student@123';
+  
+  const origin = req.get('origin') || req.get('referer');
+  await sendWelcomeEmail(user, defaultPassword, user.college?.name, origin);
+
+  res.status(200).json({ message: "Welcome email resent successfully." });
+});

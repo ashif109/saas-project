@@ -185,3 +185,25 @@ exports.deleteFaculty = asyncHandler(async (req, res) => {
     where: { id }
   });
 
+  res.status(200).json({ message: "Faculty removed successfully" });
+});
+
+exports.resendWelcomeEmail = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { facultyProfile: true, college: true }
+  });
+
+  if (!user || !user.facultyProfile) {
+    return res.status(404).json({ message: "Faculty not found." });
+  }
+
+  const defaultPassword = 'Faculty@123';
+  
+  const origin = req.get('origin') || req.get('referer');
+  await sendWelcomeEmail(user, defaultPassword, user.college?.name, origin);
+
+  res.status(200).json({ message: "Welcome email resent successfully." });
+});
