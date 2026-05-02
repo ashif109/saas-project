@@ -124,10 +124,6 @@ export default function FacultyPage() {
         description: err.response?.data?.message || "Something went wrong.",
         variant: "destructive"
       });
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to remove this faculty member? This action cannot be undone.")) return;
@@ -317,6 +313,12 @@ export default function FacultyPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => startEdit(member)}><Edit2 className="h-4 w-4 mr-2" /> Edit Profile</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSendEmail(member.email)}>
+                              <Mail className="h-4 w-4 mr-2" /> Send Direct Email
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResendCredentials(member._id)}>
+                              <UserCheck className="h-4 w-4 mr-2" /> Resend Credentials
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(member._id)}><Trash2 className="h-4 w-4 mr-2" /> Remove Faculty</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

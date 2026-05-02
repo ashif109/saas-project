@@ -342,9 +342,3 @@ exports.updateStudent = asyncHandler(async (req, res) => {
       name: `${updatedUser.firstName} ${updatedUser.lastName}`,
       email: updatedUser.email,
       phone: updatedUser.phone || '',
-      department: deptName,
-      semester: '1st Semester',
-      status: updatedUser.isActive ? 'Active' : 'Suspended'
-    }
-  });
-});

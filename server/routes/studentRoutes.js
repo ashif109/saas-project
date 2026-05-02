@@ -11,5 +11,6 @@ router.post('/bulk-enroll', studentController.bulkEnrollStudents);
 router.get('/list', studentController.getStudents);
 router.put('/:id', studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
+router.post('/resend-welcome/:id', studentController.resendWelcomeEmail);
 
 module.exports = router;

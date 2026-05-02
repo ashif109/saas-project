@@ -118,13 +118,6 @@ export default function StudentsPage() {
     }
   };
 
-  const handleStudentEnrolled = (newStudent: any) => {
-    fetchStudents(1, searchTerm);
-  };
-  
-  const handleStudentUpdated = (updatedStudent: any) => {
-    fetchStudents(pagination.page, searchTerm);
-  };
 
   return (
     <DashboardLayout>
@@ -225,8 +218,11 @@ export default function StudentsPage() {
                               <DropdownMenuItem onClick={() => { setEditingStudent(student); setIsEditDialogOpen(true); }} className="rounded-lg p-2.5">
                                 <Edit2 className="h-4 w-4 mr-2" /> Edit Profile
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="rounded-lg p-2.5">
-                                <Mail className="h-4 w-4 mr-2" /> Send Email
+                              <DropdownMenuItem onClick={() => handleSendEmail(student.email)} className="rounded-lg p-2.5">
+                                <Mail className="h-4 w-4 mr-2" /> Send Direct Email
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleResendCredentials(student._id)} className="rounded-lg p-2.5">
+                                <GraduationCap className="h-4 w-4 mr-2" /> Resend Credentials
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDelete(student._id)} className="text-rose-500 rounded-lg p-2.5 focus:bg-rose-50 focus:text-rose-500">
                                 <Trash2 className="h-4 w-4 mr-2" /> Revoke Enrollment

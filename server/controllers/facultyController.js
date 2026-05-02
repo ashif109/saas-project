@@ -185,5 +185,3 @@ exports.deleteFaculty = asyncHandler(async (req, res) => {
     where: { id }
   });
 
-  res.status(200).json({ message: "Faculty removed successfully" });
-});
