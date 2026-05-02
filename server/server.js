@@ -14,14 +14,16 @@ const app = express();
 
 // --- CORS Configuration ---
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow all origins for the multi-tenant SaaS frontend dynamically
-        callback(null, true);
-    },
+    origin: true, // Reflects the request origin, allows any origin in a secure way for multi-tenant
     credentials: true,
     methods: ['GET', 'OPTIONS', 'PATCH', 'DELETE', 'POST', 'PUT'],
-    allowedHeaders: ['X-CSRF-Token', 'X-Requested-With', 'Accept', 'Accept-Version', 'Content-Length', 'Content-MD5', 'Content-Type', 'Date', 'X-Api-Version', 'Authorization']
+    allowedHeaders: ['X-CSRF-Token', 'X-Requested-With', 'Accept', 'Accept-Version', 'Content-Length', 'Content-MD5', 'Content-Type', 'Date', 'X-Api-Version', 'Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 }));
+
+// Explicitly handle preflight requests for all routes
+app.options('*', cors());
 
 // --- Middleware ---
 app.use(express.json({ limit: '10mb' }));
@@ -30,6 +32,10 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // --- Serverless DB Connection Middleware ---
 // Ensures Vercel waits for DB connection before hitting API routes, avoiding 'buffering timed out'
 app.use(async (req, res, next) => {
+    // Skip database connection for preflight OPTIONS requests to avoid CORS timeouts
+    if (req.method === 'OPTIONS') {
+        return next();
+    }
     await connectDB();
     next();
 });
