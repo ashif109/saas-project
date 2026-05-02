@@ -49,7 +49,8 @@ exports.onboardFaculty = asyncHandler(async (req, res) => {
   });
 
   // Send Welcome Email
-  await sendWelcomeEmail(newFaculty, defaultPassword, newFaculty.college?.name);
+  const origin = req.get('origin') || req.get('referer');
+  await sendWelcomeEmail(newFaculty, defaultPassword, newFaculty.college?.name, origin);
 
   res.status(201).json({
     message: "Faculty onboarded successfully and welcome email sent.",

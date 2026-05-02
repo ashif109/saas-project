@@ -22,9 +22,15 @@ transporter.verify((error, success) => {
   }
 });
 
-const sendWelcomeEmail = async (user, password, collegeName = 'PulseDesk') => {
+const sendWelcomeEmail = async (user, password, collegeName = 'PulseDesk', baseUrl = null) => {
   try {
-    const loginUrl = process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login';
+    // If baseUrl is provided (e.g. from req.origin), use it. otherwise fallback to env
+    let finalBaseUrl = baseUrl || process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login';
+    
+    // Ensure we have /login at the end if it's just a domain
+    if (!finalBaseUrl.includes('/login')) {
+      finalBaseUrl = finalBaseUrl.replace(/\/$/, '') + '/login';
+    }
     
     const mailOptions = {
       from: process.env.SMTP_FROM,
@@ -42,7 +48,7 @@ const sendWelcomeEmail = async (user, password, collegeName = 'PulseDesk') => {
           </div>
           
           <p style="text-align: center; margin: 30px 0;">
-            <a href="${loginUrl}" style="background-color: #2563eb; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
+            <a href="${finalBaseUrl}" style="background-color: #2563eb; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
           </p>
           
           <p style="font-size: 12px; color: #6b7280; margin-top: 40px;">

@@ -105,7 +105,8 @@ exports.enrollStudent = asyncHandler(async (req, res) => {
   });
 
   // Send Welcome Email
-  await sendWelcomeEmail(newStudent, defaultPassword, newStudent.college?.name);
+  const origin = req.get('origin') || req.get('referer');
+  await sendWelcomeEmail(newStudent, defaultPassword, newStudent.college?.name, origin);
 
   res.status(201).json({
     message: "Student enrolled successfully and welcome email sent.",
@@ -258,7 +259,8 @@ exports.bulkEnrollStudents = asyncHandler(async (req, res) => {
         // We trigger email asynchronously outside of the loop if possible, 
         // but for now let's just send it. 
         // Note: In high-scale this should be queued.
-        await sendWelcomeEmail(newUser, defaultPassword);
+        const origin = req.get('origin') || req.get('referer');
+        await sendWelcomeEmail(newUser, defaultPassword, null, origin);
         
         results.push({ email, status: "Success" });
       } catch (err) {
