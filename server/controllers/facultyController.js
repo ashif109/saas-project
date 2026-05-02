@@ -50,7 +50,23 @@ exports.onboardFaculty = asyncHandler(async (req, res) => {
 
   // Send Welcome Email
   const origin = req.get('origin') || req.get('referer');
-  await sendWelcomeEmail(newFaculty, defaultPassword, newFaculty.college?.name, origin);
+  try {
+    await sendWelcomeEmail(newFaculty, defaultPassword, newFaculty.college?.name, origin);
+  } catch (emailErr) {
+    console.error("Welcome email failed during onboarding:", emailErr);
+    return res.status(201).json({
+      message: "Faculty onboarded successfully, but welcome email failed to send. Please use 'Resend Credentials' from the dashboard.",
+      faculty: {
+        _id: newFaculty.id,
+        id: newFaculty.facultyProfile.employeeId,
+        name: `${newFaculty.firstName} ${newFaculty.lastName}`,
+        email: newFaculty.email,
+        role: designation || 'Professor',
+        departmentId: newFaculty.facultyProfile.departmentId,
+        status: 'Available'
+      }
+    });
+  }
 
   res.status(201).json({
     message: "Faculty onboarded successfully and welcome email sent.",
@@ -203,7 +219,11 @@ exports.resendWelcomeEmail = asyncHandler(async (req, res) => {
   const defaultPassword = 'Faculty@123';
   
   const origin = req.get('origin') || req.get('referer');
-  await sendWelcomeEmail(user, defaultPassword, user.college?.name, origin);
-
-  res.status(200).json({ message: "Welcome email resent successfully." });
+  try {
+    await sendWelcomeEmail(user, defaultPassword, user.college?.name, origin);
+    res.status(200).json({ message: "Welcome email resent successfully." });
+  } catch (error) {
+    console.error("Resend credentials failed for faculty:", error);
+    res.status(500).json({ message: "Failed to send email. Please check your SMTP settings." });
+  }
 });

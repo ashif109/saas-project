@@ -170,8 +170,9 @@ export default function StudentsPage() {
                 />
               </div>
               <AdvancedFilterSheet 
+                filters={filters}
+                setFilters={setFilters}
                 departments={departments} 
-                onFilterChange={(newFilters) => setFilters({...filters, ...newFilters})} 
               />
             </div>
           </CardHeader>

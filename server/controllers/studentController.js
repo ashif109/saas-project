@@ -106,7 +106,23 @@ exports.enrollStudent = asyncHandler(async (req, res) => {
 
   // Send Welcome Email
   const origin = req.get('origin') || req.get('referer');
-  await sendWelcomeEmail(newStudent, defaultPassword, newStudent.college?.name, origin);
+  try {
+    await sendWelcomeEmail(newStudent, defaultPassword, newStudent.college?.name, origin);
+  } catch (emailErr) {
+    console.error("Welcome email failed during enrollment:", emailErr);
+    return res.status(201).json({
+      message: "Student enrolled successfully, but welcome email failed to send. Please use 'Resend Credentials' from the dashboard.",
+      student: {
+        _id: newStudent.id,
+        id: newStudent.studentProfile.enrollmentNo,
+        name: `${newStudent.firstName} ${newStudent.lastName}`,
+        email: newStudent.email,
+        department: department || 'General',
+        semester: semester || '1',
+        status: newStudent.isActive ? 'Active' : 'Inactive'
+      }
+    });
+  }
 
   res.status(201).json({
     message: "Student enrolled successfully and welcome email sent.",
@@ -364,7 +380,11 @@ exports.resendWelcomeEmail = asyncHandler(async (req, res) => {
   const defaultPassword = 'Student@123';
   
   const origin = req.get('origin') || req.get('referer');
-  await sendWelcomeEmail(user, defaultPassword, user.college?.name, origin);
-
-  res.status(200).json({ message: "Welcome email resent successfully." });
+  try {
+    await sendWelcomeEmail(user, defaultPassword, user.college?.name, origin);
+    res.status(200).json({ message: "Welcome email resent successfully." });
+  } catch (error) {
+    console.error("Resend credentials failed:", error);
+    res.status(500).json({ message: "Failed to send email. Please check your SMTP settings." });
+  }
 });

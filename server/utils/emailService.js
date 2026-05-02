@@ -67,8 +67,7 @@ const sendWelcomeEmail = async (user, password, collegeName = 'PulseDesk', baseU
     return info;
   } catch (error) {
     console.error('Send Welcome Email Error:', error);
-    // We don't want to throw error here to avoid breaking the enrollment flow if email fails
-    return null;
+    throw new Error('Failed to send email. Please check SMTP configuration.');
   }
 };
 
