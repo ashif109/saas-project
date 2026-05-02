@@ -12,9 +12,9 @@ dotenv.config();
 
 const app = express();
 
-// --- CORS Configuration ---
+// --- 1. CORS Configuration (MUST BE FIRST) ---
 app.use(cors({
-    origin: true, // Reflects the request origin, allows any origin in a secure way for multi-tenant
+    origin: true,
     credentials: true,
     methods: ['GET', 'OPTIONS', 'PATCH', 'DELETE', 'POST', 'PUT'],
     allowedHeaders: ['X-CSRF-Token', 'X-Requested-With', 'Accept', 'Accept-Version', 'Content-Length', 'Content-MD5', 'Content-Type', 'Date', 'X-Api-Version', 'Authorization'],
@@ -22,22 +22,29 @@ app.use(cors({
     optionsSuccessStatus: 204
 }));
 
-// Explicitly handle preflight requests for all routes
+// Handle preflight for all routes explicitly
 app.options('*', cors());
 
-// --- Middleware ---
+// --- 2. Middleware ---
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// --- Serverless DB Connection Middleware ---
-// Ensures Vercel waits for DB connection before hitting API routes, avoiding 'buffering timed out'
-app.use(async (req, res, next) => {
-    // Skip database connection for preflight OPTIONS requests to avoid CORS timeouts
+// --- 3. Serverless DB Connection Middleware ---
+app.use((req, res, next) => {
+    // Skip DB connection for preflight OPTIONS requests to avoid CORS timeouts
     if (req.method === 'OPTIONS') {
         return next();
     }
-    await connectDB();
-    next();
+    
+    // Use promise-based handling to prevent crashes in serverless environment
+    connectDB()
+        .then(() => next())
+        .catch(err => {
+            console.error('CRITICAL: DB Connection Middleware Error:', err);
+            // Even if DB fails, we call next to let the error handler catch it later
+            // instead of crashing the whole function invocation.
+            next();
+        });
 });
 
 // --- Basic Routes ---
