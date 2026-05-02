@@ -53,7 +53,6 @@ export default function StudentsPage() {
       if (search) params.search = search;
       if (activeFilters.department !== 'all') params.department = activeFilters.department;
       if (activeFilters.status !== 'all') params.status = activeFilters.status;
-      // semester filter logic can be added here if backend supports it
 
       const res = await api.get('/api/students/list', { params });
       setStudentsList(res.data.data || []);
@@ -118,6 +117,28 @@ export default function StudentsPage() {
     }
   };
 
+  const handleSendEmail = (email: string) => {
+    window.location.href = `mailto:${email}`;
+  };
+
+  const handleResendCredentials = async (studentId: string) => {
+    const loadingToast = toast.loading("Resending credentials...");
+    try {
+      await api.post(`/api/students/resend-welcome/${studentId}`);
+      toast.success("Welcome credentials resent successfully.", { id: loadingToast });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to resend credentials.", { id: loadingToast });
+    }
+  };
+
+  const handleStudentEnrolled = () => {
+    fetchStudents(1, searchTerm);
+  };
+
+  const handleStudentUpdated = () => {
+    fetchStudents(pagination.page, searchTerm);
+    setIsEditDialogOpen(false);
+  };
 
   return (
     <DashboardLayout>
@@ -138,88 +159,96 @@ export default function StudentsPage() {
 
         <Card className="border-none shadow-xl shadow-slate-200/50">
           <CardHeader className="pb-4">
-            <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="relative w-full md:w-96">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input 
-                  placeholder="Search by name, ID or email..." 
-                  className="pl-10 h-11 bg-secondary/30 border-none shadow-inner"
+                  placeholder="Search by name, email, or enrollment ID..." 
+                  className="pl-10 h-11 bg-slate-50 border-none focus-visible:ring-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="flex gap-2">
-                <AdvancedFilterSheet filters={filters} setFilters={setFilters} departments={departments} />
-              </div>
+              <AdvancedFilterSheet 
+                departments={departments} 
+                onFilterChange={(newFilters) => setFilters({...filters, ...newFilters})} 
+              />
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
+          <CardContent>
+            <div className="rounded-xl border border-slate-100 overflow-hidden">
               <Table>
                 <TableHeader className="bg-slate-50/50">
-                  <TableRow className="hover:bg-transparent border-b">
-                    <TableHead className="pl-6 h-12 font-bold text-slate-600">Student</TableHead>
-                    <TableHead className="font-bold text-slate-600">ID</TableHead>
-                    <TableHead className="font-bold text-slate-600">Department</TableHead>
-                    <TableHead className="font-bold text-slate-600">Semester</TableHead>
-                    <TableHead className="font-bold text-slate-600">Status</TableHead>
-                    <TableHead className="text-right pr-6 font-bold text-slate-600">Actions</TableHead>
+                  <TableRow>
+                    <TableHead className="w-[100px] font-bold text-slate-500">ID</TableHead>
+                    <TableHead className="font-bold text-slate-500">Student</TableHead>
+                    <TableHead className="font-bold text-slate-500">Department</TableHead>
+                    <TableHead className="font-bold text-slate-500">Semester</TableHead>
+                    <TableHead className="font-bold text-slate-500">Status</TableHead>
+                    <TableHead className="text-right font-bold text-slate-500">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    Array(5).fill(0).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="pl-6 py-4"><div className="h-10 w-48 bg-slate-100 animate-pulse rounded-md"></div></TableCell>
-                        <TableCell><div className="h-4 w-16 bg-slate-100 animate-pulse rounded-md"></div></TableCell>
-                        <TableCell><div className="h-4 w-32 bg-slate-100 animate-pulse rounded-md"></div></TableCell>
-                        <TableCell><div className="h-4 w-24 bg-slate-100 animate-pulse rounded-md"></div></TableCell>
-                        <TableCell><div className="h-6 w-16 bg-slate-100 animate-pulse rounded-full"></div></TableCell>
-                        <TableCell></TableCell>
-                      </TableRow>
-                    ))
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-64 text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                          <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                          <span className="text-slate-500 font-medium">Synchronizing data...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ) : studentsList.length > 0 ? (
                     studentsList.map((student) => (
-                      <TableRow key={student._id || student.id} className="group hover:bg-blue-50/30 transition-colors">
-                        <TableCell className="pl-6 py-4">
+                      <TableRow key={student._id} className="hover:bg-slate-50/50 transition-colors group">
+                        <TableCell className="font-mono text-xs text-slate-400">{student.id}</TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 border-2 border-white shadow-sm transition-transform group-hover:scale-105">
-                              <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${student.name}&backgroundColor=b6e3f4`} />
-                              <AvatarFallback className="bg-blue-50 text-blue-600 font-bold">{student.name.charAt(0)}</AvatarFallback>
+                            <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                              <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">
+                                {student.name.split(' ').map((n: string) => n[0]).join('')}
+                              </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <p className="font-bold text-sm text-slate-900 leading-none mb-1">{student.name}</p>
-                              <p className="text-[10px] font-medium text-slate-500">{student.email}</p>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{student.name}</span>
+                              <span className="text-xs text-slate-400">{student.email}</span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs font-mono font-bold text-slate-600">{student.id}</TableCell>
-                        <TableCell className="text-sm font-medium">{student.department}</TableCell>
-                        <TableCell className="text-sm">
-                          <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
-                            {student.semester}
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none font-medium">
+                            {student.department}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={student.status === 'Active' ? 'default' : 'secondary'} className={
-                            student.status === 'Active' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 font-bold' : 'border-none px-3'
-                          }>
+                          <span className="text-sm text-slate-600">{student.semester}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={`rounded-full border-none px-3 py-1 ${
+                              student.status === 'Active' 
+                                ? 'bg-emerald-50 text-emerald-600' 
+                                : 'bg-rose-50 text-rose-600'
+                            }`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full mr-2 ${student.status === 'Active' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                             {student.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right pr-6">
+                        <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-600">
+                              <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl shadow-2xl border-none">
+                            <DropdownMenuContent align="end" className="w-48 p-1.5 rounded-xl border-none shadow-2xl">
                               <DropdownMenuItem onClick={() => { setEditingStudent(student); setIsEditDialogOpen(true); }} className="rounded-lg p-2.5">
                                 <Edit2 className="h-4 w-4 mr-2" /> Edit Profile
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSendEmail(student.email)} className="rounded-lg p-2.5">
-                                <Mail className="h-4 w-4 mr-2" /> Send Direct Email
+                                <Mail className="h-4 w-4 mr-2" /> Send Email
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleResendCredentials(student._id)} className="rounded-lg p-2.5">
                                 <GraduationCap className="h-4 w-4 mr-2" /> Resend Credentials
