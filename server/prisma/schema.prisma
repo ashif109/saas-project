@@ -32,6 +32,7 @@ model User {
   facultyProfile FacultyProfile?
 
   auditLogs      AuditLog[] @relation("UserAuditLogs")
+  doubtReplies   DoubtReply[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -150,6 +151,9 @@ model Subject {
   facultyAssignments FacultySubject[]
   timetables         TimetableEntry[]
   attendances        Attendance[]
+  internalMarks      InternalMark[]
+  assignments        Assignment[]
+  doubts             Doubt[]
 
   createdAt   DateTime   @default(now())
   updatedAt   DateTime @updatedAt
@@ -206,6 +210,9 @@ model StudentProfile {
   transactions   Transaction[]
   scholarshipApplications ScholarshipApplication[]
   attendances    Attendance[]
+  internalMarks  InternalMark[]
+  assignmentSubmissions AssignmentSubmission[]
+  doubts         Doubt[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -224,6 +231,10 @@ model FacultyProfile {
 
   subjects       FacultySubject[]
   timetables     TimetableEntry[]
+  assignments    Assignment[]
+  doubts         Doubt[]
+  leaveRequests  LeaveRequest[] @relation("LeaveRequests")
+  substituteRequests LeaveRequest[] @relation("SubstituteRequests")
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -426,3 +437,108 @@ model Attendance {
 
   @@unique([studentId, subjectId, date])
 }
+
+// --- Faculty Panel Models ---
+
+model InternalMark {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId     String   @db.ObjectId
+  subjectId     String   @db.ObjectId
+  examName      String   // e.g. "Midterm 1", "Quiz 1", "Assignment 1"
+  marksObtained Float
+  maxMarks      Float
+  
+  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject       Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Assignment {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String?
+  fileUrl       String?  // Optional uploaded PDF
+  dueDate       DateTime
+  
+  subjectId     String   @db.ObjectId
+  facultyId     String   @db.ObjectId
+  
+  subject       Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  faculty       FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  
+  submissions   AssignmentSubmission[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AssignmentSubmission {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId  String   @db.ObjectId
+  studentId     String   @db.ObjectId
+  
+  fileUrl       String?
+  status        String   @default("SUBMITTED") // SUBMITTED, LATE, GRADED
+  marks         Float?
+  feedback      String?
+  
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([assignmentId, studentId])
+}
+
+model LeaveRequest {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  facultyId     String   @db.ObjectId
+  startDate     DateTime
+  endDate       DateTime
+  reason        String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  substituteId  String?  @db.ObjectId
+  
+  faculty       FacultyProfile @relation("LeaveRequests", fields: [facultyId], references: [id], onDelete: Cascade)
+  substitute    FacultyProfile? @relation("SubstituteRequests", fields: [substituteId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Doubt {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId     String   @db.ObjectId
+  subjectId     String   @db.ObjectId
+  facultyId     String   @db.ObjectId
+  
+  question      String
+  status        String   @default("OPEN") // OPEN, RESOLVED
+  
+  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject       Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  faculty       FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  
+  replies       DoubtReply[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model DoubtReply {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  doubtId       String   @db.ObjectId
+  userId        String   @db.ObjectId // Can be student or faculty
+  
+  message       String
+  
+  doubt         Doubt    @relation(fields: [doubtId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+}
+

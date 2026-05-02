@@ -92,6 +92,17 @@ const COLLEGE_ADMIN_ITEMS = [
   { title: "Settings", icon: Settings, url: "/settings" },
 ];
 
+const FACULTY_ITEMS = [
+  { title: "Dashboard", icon: LayoutDashboard, url: "/faculty-panel" },
+  { title: "My Timetable", icon: Calendar, url: "/faculty-panel/timetable" },
+  { title: "Attendance", icon: CheckCircle2, url: "/faculty-panel/attendance" },
+  { title: "Assignments", icon: FileText, url: "/faculty-panel/assignments" },
+  { title: "Internal Marks", icon: PieChart, url: "/faculty-panel/marks" },
+  { title: "Performance Tracker", icon: Activity, url: "/faculty-panel/performance" },
+  { title: "Doubts & Queries", icon: MessageSquare, url: "/faculty-panel/doubts" },
+  { title: "Leave Management", icon: Clock, url: "/faculty-panel/leave" },
+];
+
 function PulseLogo() {
   return (
     <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -195,7 +206,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const menuItems = useMemo(() => {
     if (!user) return [];
-    const baseItems = user.role === 'SUPER_ADMIN' ? SUPER_ADMIN_ITEMS : COLLEGE_ADMIN_ITEMS;
+    
+    let baseItems = COLLEGE_ADMIN_ITEMS;
+    if (user.role === 'SUPER_ADMIN') baseItems = SUPER_ADMIN_ITEMS;
+    else if (user.role === 'FACULTY') baseItems = FACULTY_ITEMS;
+    
     return baseItems.filter(item => {
       if (item.title === 'Doubts' && settings && !settings.globalDoubtSystem) return false;
       if (item.title === 'Attendance' && settings && !settings.globalAttendance) return false;
