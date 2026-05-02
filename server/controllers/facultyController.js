@@ -74,28 +74,49 @@ exports.onboardFaculty = async (req, res) => {
 
 exports.getFaculties = async (req, res) => {
   try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
     let collegeId = req.user?.college || req.user?.collegeId;
     if (!collegeId) {
       const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
 
-    if (!collegeId) return res.status(200).json([]);
+    if (!collegeId) return res.status(200).json({ data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } });
 
-    const faculties = await prisma.user.findMany({
-      where: {
-        collegeId,
-        facultyProfile: { isNot: null }
-      },
-      include: {
-        facultyProfile: {
-          include: {
-            department: true
+    // Build filter query
+    const where = {
+      collegeId,
+      facultyProfile: { isNot: null }
+    };
+
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { facultyProfile: { employeeId: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+
+    const [faculties, totalCount] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        include: {
+          facultyProfile: {
+            include: {
+              department: true
+            }
           }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take
+      }),
+      prisma.user.count({ where })
+    ]);
 
     const mapped = faculties.map(f => ({
       _id: f.id,
@@ -109,7 +130,15 @@ exports.getFaculties = async (req, res) => {
       status: 'Available'
     }));
 
-    res.status(200).json(mapped);
+    res.status(200).json({
+      data: mapped,
+      pagination: {
+        total: totalCount,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalCount / take)
+      }
+    });
   } catch (error) {
     console.error('Fetch Faculty Error:', error);
     res.status(500).json({ message: "Internal server error fetching faculty" });

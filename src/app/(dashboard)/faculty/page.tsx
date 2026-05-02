@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,6 +34,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+import { Pagination } from '@/components/shared/Pagination';
 
 export default function FacultyPage() {
   const { toast } = useToast();
@@ -44,6 +45,14 @@ export default function FacultyPage() {
   const [submitting, setSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
   
+  // Pagination State
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0
+  });
+
   // Edit State
   const [editOpen, setEditOpen] = useState(false);
   const [editingFaculty, setEditingFaculty] = useState<any>(null);
@@ -56,15 +65,16 @@ export default function FacultyPage() {
     designation: 'Professor'
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (page = 1, search = '') => {
     setLoading(true);
     try {
       const [facRes, deptRes] = await Promise.all([
-        api.get('/api/faculty'),
+        api.get('/api/faculty', { params: { page, limit: pagination.limit, search } }),
         api.get('/api/departments')
       ]);
-      setFaculties(facRes.data);
-      setDepartments(deptRes.data);
+      setFaculties(facRes.data.data || []);
+      setPagination(facRes.data.pagination || { total: 0, page: 1, limit: 10, totalPages: 0 });
+      setDepartments(deptRes.data || []);
     } catch (err) {
       console.error("Failed to fetch data", err);
       toast({
@@ -75,11 +85,23 @@ export default function FacultyPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.limit, toast]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(1, searchTerm);
   }, []);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData(1, searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, fetchData]);
+
+  const handlePageChange = (page: number) => {
+    fetchData(page, searchTerm);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +117,7 @@ export default function FacultyPage() {
       setOpen(false);
       setEditOpen(false);
       setFormData({ name: '', email: '', departmentId: '', designation: 'Professor' });
-      fetchData();
+      fetchData(pagination.page, searchTerm);
     } catch (err: any) {
       toast({
         title: "Action Failed",
@@ -112,7 +134,7 @@ export default function FacultyPage() {
     try {
       await api.delete(`/api/faculty/${id}`);
       toast({ title: "Deleted", description: "Faculty member removed." });
-      fetchData();
+      fetchData(pagination.page, searchTerm);
     } catch (err) {
       toast({ title: "Error", description: "Failed to delete.", variant: "destructive" });
     }
@@ -128,11 +150,6 @@ export default function FacultyPage() {
     });
     setEditOpen(true);
   };
-
-  const filteredFaculty = faculties.filter(f => 
-    f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    f.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <DashboardLayout>
@@ -266,10 +283,10 @@ export default function FacultyPage() {
                    [...Array(3)].map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5} className="h-16 text-center text-slate-400"><Loader2 className="h-5 w-5 animate-spin inline mr-2" /> Loading...</TableCell></TableRow>
                    ))
-                ) : filteredFaculty.length === 0 ? (
+                ) : faculties.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="h-32 text-center text-slate-500">No records found.</TableCell></TableRow>
                 ) : (
-                  filteredFaculty.map((member) => (
+                  faculties.map((member) => (
                     <TableRow key={member._id} className="group hover:bg-slate-50/50">
                       <TableCell className="pl-6 py-4">
                         <div className="flex items-center gap-3">
@@ -309,6 +326,15 @@ export default function FacultyPage() {
                 )}
               </TableBody>
             </Table>
+            {!loading && (
+              <Pagination 
+                currentPage={pagination.page} 
+                totalPages={pagination.totalPages} 
+                onPageChange={handlePageChange} 
+                totalItems={pagination.total} 
+                limit={pagination.limit} 
+              />
+            )}
           </CardContent>
         </Card>
       </div>

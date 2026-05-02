@@ -145,52 +145,163 @@ exports.enrollStudent = async (req, res) => {
 
 exports.getStudents = async (req, res) => {
   try {
+    const { page = 1, limit = 10, search = '', department, semester, status } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
     let collegeId = req.user?.collegeId;
     if (!collegeId) {
       let firstCollege = await prisma.college.findFirst();
-      if (!firstCollege) {
-        firstCollege = await prisma.college.create({
-          data: { name: "PulseDesk Default", address: "Cloud Provider", subdomain: "default" }
-        });
-      }
-      collegeId = firstCollege.id;
+      collegeId = firstCollege?.id;
     }
 
-    const students = await prisma.user.findMany({
-      where: {
-        collegeId,
-        studentProfile: { isNot: null }
-      },
-      include: {
-        studentProfile: {
-          include: {
-            batch: {
-              include: { course: { include: { department: true } } }
+    // Build filter query
+    const where = {
+      collegeId,
+      studentProfile: { isNot: null }
+    };
+
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { studentProfile: { enrollmentNo: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+
+    if (department) {
+      where.studentProfile = {
+        ...where.studentProfile,
+        batch: { course: { departmentId: department } }
+      };
+    }
+
+    if (status) {
+      where.isActive = status === 'Active';
+    }
+
+    // semester is more complex as it's usually on subjects, but we can check batch mappings if they exist
+    // For now, let's keep it simple or based on a specific logic if available.
+
+    const [students, totalCount] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        include: {
+          studentProfile: {
+            include: {
+              batch: {
+                include: { course: { include: { department: true } } }
+              }
             }
           }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take
+      }),
+      prisma.user.count({ where })
+    ]);
 
     // Format for frontend
     const mapped = students.map(s => {
       const deptName = s.studentProfile?.batch?.course?.department?.name || 'General';
       return {
-        _id: s.id, // raw mongo id
-        id: s.studentProfile?.enrollmentNo, // friendly view id
+        _id: s.id,
+        id: s.studentProfile?.enrollmentNo,
         name: `${s.firstName} ${s.lastName}`,
         email: s.email,
         department: deptName,
-        semester: '1st Semester', // Usually derived from batch/subject mappings
+        semester: '1st Semester', 
         status: s.isActive ? 'Active' : 'Suspended'
       };
     });
 
-    res.status(200).json(mapped);
+    res.status(200).json({
+      data: mapped,
+      pagination: {
+        total: totalCount,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalCount / take)
+      }
+    });
   } catch (error) {
     console.error('Fetch Students Error:', error);
     res.status(500).json({ message: "Internal server error fetching students" });
+  }
+};
+
+exports.bulkEnrollStudents = async (req, res) => {
+  try {
+    const { students } = req.body; // Array of { name, email, department, semester }
+    
+    if (!students || !Array.isArray(students)) {
+      return res.status(400).json({ message: "Invalid students data" });
+    }
+
+    let collegeId = req.user?.collegeId;
+    if (!collegeId) {
+      const firstCollege = await prisma.college.findFirst();
+      collegeId = firstCollege?.id;
+    }
+
+    const batch = await ensureDefaultBatch(collegeId);
+    const hashedPassword = await bcrypt.hash('Student@123', 10);
+
+    const results = [];
+    const errors = [];
+
+    // Use transaction for consistency
+    await prisma.$transaction(async (tx) => {
+      for (const s of students) {
+        try {
+          const { name, email } = s;
+          
+          const existing = await tx.user.findUnique({ where: { email } });
+          if (existing) {
+            errors.push({ email, error: "Email already exists" });
+            continue;
+          }
+
+          const nameParts = name.trim().split(' ');
+          const firstName = nameParts[0];
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+          const enrollmentNo = `ENR${Math.random().toString().slice(2, 8)}`;
+
+          await tx.user.create({
+            data: {
+              email,
+              password: hashedPassword,
+              firstName,
+              lastName,
+              collegeId,
+              studentProfile: {
+                create: {
+                  enrollmentNo,
+                  admissionDate: new Date(),
+                  batchId: batch.id
+                }
+              }
+            }
+          });
+          results.push({ email, status: "Success" });
+        } catch (err) {
+          errors.push({ email: s.email, error: err.message });
+        }
+      }
+    });
+
+    res.status(201).json({
+      message: "Bulk enrollment completed",
+      successCount: results.length,
+      errorCount: errors.length,
+      errors
+    });
+
+  } catch (error) {
+    console.error('Bulk Enroll Error:', error);
+    res.status(500).json({ message: "Internal server error during bulk enrollment" });
   }
 };
 

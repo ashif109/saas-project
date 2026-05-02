@@ -7,6 +7,7 @@ const studentController = require('../controllers/studentController');
 // For simplicity and matching your existing un-protected testing phase, we inject auth optionally.
 
 router.post('/enroll', studentController.enrollStudent);
+router.post('/bulk-enroll', studentController.bulkEnrollStudents);
 router.get('/list', studentController.getStudents);
 router.put('/:id', studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
