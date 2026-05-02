@@ -1,5 +1,7 @@
 const prisma = require('../config/prisma');
 const bcrypt = require('bcryptjs');
+const asyncHandler = require('../utils/asyncHandler');
+const { sendWelcomeEmail } = require('../utils/emailService');
 
 /**
  * Ensures that basic relational structures (Year, Dept, Course, Batch)
@@ -51,313 +53,114 @@ async function ensureDefaultBatch(collegeId) {
   return batch;
 }
 
-exports.enrollStudent = async (req, res) => {
-  try {
-    if (!req.body) {
-      return res.status(400).json({ message: "Request body is missing" });
-    }
-
-    const { name, email, department, semester } = req.body;
-    
-    // Basic Validation
-    if (!name || !email) {
-      return res.status(400).json({ message: "Name and email are required fields." });
-    }
-
-    // req.user might be from authMiddleware
-    // If not, we will rely on a collegeId passed or fallback to first college for dev testing
-    let collegeId = req.user?.college || req.user?.collegeId;
-    if (!collegeId) {
-      const firstCollege = await prisma.college.findFirst();
-      if (!firstCollege) {
-        // Auto-seed for fresh production deployment
-        firstCollege = await prisma.college.create({
-          data: { name: "PulseDesk Default", address: "Cloud Provider", subdomain: "default" }
-        });
-      }
-      collegeId = firstCollege.id;
-    }
-
-    // Check if email exists
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return res.status(400).json({ message: "Email is already registered." });
-    }
-
-    // Auto-generate generic batch to prevent relation crashing
-    const batch = await ensureDefaultBatch(collegeId);
-
-    // Split name safely
-    const nameParts = name.trim().split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-
-    // Create User & StudentProfile in a transaction
-    const hashedPassword = await bcrypt.hash('Student@123', 10);
-    const enrollmentNo = `ENR${Math.random().toString().slice(2, 8)}`;
-
-    const newStudent = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        collegeId,
-        isActive: true,
-        studentProfile: {
-          create: {
-            enrollmentNo,
-            admissionDate: new Date(),
-            batchId: batch.id
-          }
-        }
-      },
-      include: { studentProfile: true }
-    });
-
-    res.status(201).json({
-      message: "Student enrolled successfully",
-      student: {
-        _id: newStudent.id,
-        id: newStudent.studentProfile.enrollmentNo,
-        name: `${newStudent.firstName} ${newStudent.lastName}`,
-        email: newStudent.email,
-        department: department || 'General',
-        semester: semester || '1',
-        status: newStudent.isActive ? 'Active' : 'Inactive'
-      }
-    });
-
-  } catch (error) {
-    console.error('Enroll Error Details:', error);
-    
-    // Check for Prisma specific errors (e.g., connection timeout, validation error)
-    if (error.code) {
-      console.error(`Prisma Error Code: ${error.code}`);
-    }
-    
-    res.status(500).json({ 
-      message: "Internal server error", 
-      error: error.message || String(error)
-    });
+exports.enrollStudent = asyncHandler(async (req, res) => {
+  if (!req.body) {
+    return res.status(400).json({ message: "Request body is missing" });
   }
-};
 
-exports.getStudents = async (req, res) => {
-  try {
-    const { page = 1, limit = 10, search = '', department, semester, status } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const take = parseInt(limit);
+  const { name, email, department, semester } = req.body;
+  
+  if (!name || !email) {
+    return res.status(400).json({ message: "Name and email are required fields." });
+  }
 
-    let collegeId = req.user?.collegeId;
-    if (!collegeId) {
-      let firstCollege = await prisma.college.findFirst();
-      collegeId = firstCollege?.id;
-    }
+  let collegeId = req.user?.college || req.user?.collegeId;
+  if (!collegeId) {
+    const firstCollege = await prisma.college.findFirst();
+    collegeId = firstCollege?.id;
+  }
 
-    // Build filter query
-    const where = {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return res.status(400).json({ message: "Email is already registered." });
+  }
+
+  const batch = await ensureDefaultBatch(collegeId);
+
+  const nameParts = name.trim().split(' ');
+  const firstName = nameParts[0];
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+  const defaultPassword = 'Student@123';
+  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+  const enrollmentNo = `ENR${Math.random().toString().slice(2, 8)}`;
+
+  const newStudent = await prisma.user.create({
+    data: {
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
       collegeId,
-      studentProfile: { isNot: null }
-    };
-
-    if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { studentProfile: { enrollmentNo: { contains: search, mode: 'insensitive' } } }
-      ];
-    }
-
-    if (department) {
-      where.studentProfile = {
-        ...where.studentProfile,
-        batch: { course: { departmentId: department } }
-      };
-    }
-
-    if (status) {
-      where.isActive = status === 'Active';
-    }
-
-    // semester is more complex as it's usually on subjects, but we can check batch mappings if they exist
-    // For now, let's keep it simple or based on a specific logic if available.
-
-    const [students, totalCount] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        include: {
-          studentProfile: {
-            include: {
-              batch: {
-                include: { course: { include: { department: true } } }
-              }
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take
-      }),
-      prisma.user.count({ where })
-    ]);
-
-    // Format for frontend
-    const mapped = students.map(s => {
-      const deptName = s.studentProfile?.batch?.course?.department?.name || 'General';
-      return {
-        _id: s.id,
-        id: s.studentProfile?.enrollmentNo,
-        name: `${s.firstName} ${s.lastName}`,
-        email: s.email,
-        department: deptName,
-        semester: '1st Semester', 
-        status: s.isActive ? 'Active' : 'Suspended'
-      };
-    });
-
-    res.status(200).json({
-      data: mapped,
-      pagination: {
-        total: totalCount,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(totalCount / take)
-      }
-    });
-  } catch (error) {
-    console.error('Fetch Students Error:', error);
-    res.status(500).json({ message: "Internal server error fetching students" });
-  }
-};
-
-exports.bulkEnrollStudents = async (req, res) => {
-  try {
-    const { students } = req.body; // Array of { name, email, department, semester }
-    
-    if (!students || !Array.isArray(students)) {
-      return res.status(400).json({ message: "Invalid students data" });
-    }
-
-    let collegeId = req.user?.collegeId;
-    if (!collegeId) {
-      const firstCollege = await prisma.college.findFirst();
-      collegeId = firstCollege?.id;
-    }
-
-    const batch = await ensureDefaultBatch(collegeId);
-    const hashedPassword = await bcrypt.hash('Student@123', 10);
-
-    const results = [];
-    const errors = [];
-
-    // Use transaction for consistency
-    await prisma.$transaction(async (tx) => {
-      for (const s of students) {
-        try {
-          const { name, email } = s;
-          
-          const existing = await tx.user.findUnique({ where: { email } });
-          if (existing) {
-            errors.push({ email, error: "Email already exists" });
-            continue;
-          }
-
-          const nameParts = name.trim().split(' ');
-          const firstName = nameParts[0];
-          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-          const enrollmentNo = `ENR${Math.random().toString().slice(2, 8)}`;
-
-          await tx.user.create({
-            data: {
-              email,
-              password: hashedPassword,
-              firstName,
-              lastName,
-              collegeId,
-              studentProfile: {
-                create: {
-                  enrollmentNo,
-                  admissionDate: new Date(),
-                  batchId: batch.id
-                }
-              }
-            }
-          });
-          results.push({ email, status: "Success" });
-        } catch (err) {
-          errors.push({ email: s.email, error: err.message });
+      isActive: true,
+      studentProfile: {
+        create: {
+          enrollmentNo,
+          admissionDate: new Date(),
+          batchId: batch.id
         }
       }
-    });
+    },
+    include: { studentProfile: true, college: true }
+  });
 
-    res.status(201).json({
-      message: "Bulk enrollment completed",
-      successCount: results.length,
-      errorCount: errors.length,
-      errors
-    });
+  // Send Welcome Email
+  await sendWelcomeEmail(newStudent, defaultPassword, newStudent.college?.name);
 
-  } catch (error) {
-    console.error('Bulk Enroll Error:', error);
-    res.status(500).json({ message: "Internal server error during bulk enrollment" });
-  }
-};
-
-exports.deleteStudent = async (req, res) => {
-  try {
-    const { id } = req.params; // This will actually be the enrollment id for safety or the user mapped _id
-
-    const user = await prisma.user.findFirst({
-      where: { id: id },
-      include: { studentProfile: true }
-    });
-
-    if (!user) return res.status(404).json({ message: "Student not found" });
-
-    // Actually delete or suspend
-    await prisma.user.delete({ where: { id: user.id }});
-
-    res.status(200).json({ message: "Student record securely deleted" });
-  } catch (error) {
-    console.error('Delete Student Error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-exports.updateStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email, phone, status } = req.body;
-
-    const user = await prisma.user.findFirst({
-      where: { id: id },
-      include: { studentProfile: true }
-    });
-
-    if (!user) return res.status(404).json({ message: "Student not found" });
-
-    // Check email uniqueness if email changed
-    if (email && email !== user.email) {
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) return res.status(400).json({ message: "Email is already registered to another user." });
+  res.status(201).json({
+    message: "Student enrolled successfully and welcome email sent.",
+    student: {
+      _id: newStudent.id,
+      id: newStudent.studentProfile.enrollmentNo,
+      name: `${newStudent.firstName} ${newStudent.lastName}`,
+      email: newStudent.email,
+      department: department || 'General',
+      semester: semester || '1',
+      status: newStudent.isActive ? 'Active' : 'Inactive'
     }
+  });
+});
 
-    // Prepare data
-    const dataToUpdate = {};
-    if (name) {
-      const parts = name.trim().split(' ');
-      dataToUpdate.firstName = parts[0];
-      dataToUpdate.lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
-    }
-    if (email) dataToUpdate.email = email;
-    if (phone !== undefined) dataToUpdate.phone = phone;
-    if (status !== undefined) dataToUpdate.isActive = status === 'Active';
+exports.getStudents = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, search = '', department, semester, status } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const take = parseInt(limit);
 
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: dataToUpdate,
+  let collegeId = req.user?.collegeId;
+  if (!collegeId) {
+    let firstCollege = await prisma.college.findFirst();
+    collegeId = firstCollege?.id;
+  }
+
+  // Build filter query
+  const where = {
+    collegeId,
+    studentProfile: { isNot: null }
+  };
+
+  if (search) {
+    where.OR = [
+      { firstName: { contains: search, mode: 'insensitive' } },
+      { lastName: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { studentProfile: { enrollmentNo: { contains: search, mode: 'insensitive' } } }
+    ];
+  }
+
+  if (department) {
+    where.studentProfile = {
+      ...where.studentProfile,
+      batch: { course: { departmentId: department } }
+    };
+  }
+
+  if (status) {
+    where.isActive = status === 'Active';
+  }
+
+  const [students, totalCount] = await Promise.all([
+    prisma.user.findMany({
+      where,
       include: {
         studentProfile: {
           include: {
@@ -366,27 +169,180 @@ exports.updateStudent = async (req, res) => {
             }
           }
         }
-      }
-    });
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take
+    }),
+    prisma.user.count({ where })
+  ]);
 
-    const deptName = updatedUser.studentProfile?.batch?.course?.department?.name || 'General';
+  // Format for frontend
+  const mapped = students.map(s => {
+    const deptName = s.studentProfile?.batch?.course?.department?.name || 'General';
+    return {
+      _id: s.id,
+      id: s.studentProfile?.enrollmentNo,
+      name: `${s.firstName} ${s.lastName}`,
+      email: s.email,
+      department: deptName,
+      semester: '1st Semester', 
+      status: s.isActive ? 'Active' : 'Suspended'
+    };
+  });
 
-    res.status(200).json({
-      message: "Student profile updated successfully",
-      student: {
-        _id: updatedUser.id,
-        id: updatedUser.studentProfile?.enrollmentNo,
-        name: `${updatedUser.firstName} ${updatedUser.lastName}`,
-        email: updatedUser.email,
-        phone: updatedUser.phone || '',
-        department: deptName,
-        semester: '1st Semester',
-        status: updatedUser.isActive ? 'Active' : 'Suspended'
-      }
-    });
+  res.status(200).json({
+    data: mapped,
+    pagination: {
+      total: totalCount,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(totalCount / take)
+    }
+  });
+});
 
-  } catch (error) {
-    console.error('Update Student Error:', error);
-    res.status(500).json({ message: "Internal server error updating student profile" });
+exports.bulkEnrollStudents = asyncHandler(async (req, res) => {
+  const { students } = req.body; 
+  
+  if (!students || !Array.isArray(students)) {
+    return res.status(400).json({ message: "Invalid students data" });
   }
-};
+
+  let collegeId = req.user?.collegeId;
+  if (!collegeId) {
+    const firstCollege = await prisma.college.findFirst();
+    collegeId = firstCollege?.id;
+  }
+
+  const batch = await ensureDefaultBatch(collegeId);
+  const defaultPassword = 'Student@123';
+  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+  const results = [];
+  const errors = [];
+
+  await prisma.$transaction(async (tx) => {
+    for (const s of students) {
+      try {
+        const { name, email } = s;
+        
+        const existing = await tx.user.findUnique({ where: { email } });
+        if (existing) {
+          errors.push({ email, error: "Email already exists" });
+          continue;
+        }
+
+        const nameParts = name.trim().split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+        const enrollmentNo = `ENR${Math.random().toString().slice(2, 8)}`;
+
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            firstName,
+            lastName,
+            collegeId,
+            studentProfile: {
+              create: {
+                enrollmentNo,
+                admissionDate: new Date(),
+                batchId: batch.id
+              }
+            }
+          }
+        });
+        
+        // We trigger email asynchronously outside of the loop if possible, 
+        // but for now let's just send it. 
+        // Note: In high-scale this should be queued.
+        await sendWelcomeEmail(newUser, defaultPassword);
+        
+        results.push({ email, status: "Success" });
+      } catch (err) {
+        errors.push({ email: s.email, error: err.message });
+      }
+    }
+  });
+
+  res.status(201).json({
+    message: "Bulk enrollment completed",
+    successCount: results.length,
+    errorCount: errors.length,
+    errors
+  });
+});
+
+exports.deleteStudent = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const user = await prisma.user.findFirst({
+    where: { id: id },
+    include: { studentProfile: true }
+  });
+
+  if (!user) return res.status(404).json({ message: "Student not found" });
+
+  await prisma.user.delete({ where: { id: user.id }});
+
+  res.status(200).json({ message: "Student record securely deleted" });
+});
+
+exports.updateStudent = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, status } = req.body;
+
+  const user = await prisma.user.findFirst({
+    where: { id: id },
+    include: { studentProfile: true }
+  });
+
+  if (!user) return res.status(404).json({ message: "Student not found" });
+
+  if (email && email !== user.email) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(400).json({ message: "Email is already registered to another user." });
+  }
+
+  const dataToUpdate = {};
+  if (name) {
+    const parts = name.trim().split(' ');
+    dataToUpdate.firstName = parts[0];
+    dataToUpdate.lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
+  }
+  if (email) dataToUpdate.email = email;
+  if (phone !== undefined) dataToUpdate.phone = phone;
+  if (status !== undefined) dataToUpdate.isActive = status === 'Active';
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: dataToUpdate,
+    include: {
+      studentProfile: {
+        include: {
+          batch: {
+            include: { course: { include: { department: true } } }
+          }
+        }
+      }
+    }
+  });
+
+  const deptName = updatedUser.studentProfile?.batch?.course?.department?.name || 'General';
+
+  res.status(200).json({
+    message: "Student profile updated successfully",
+    student: {
+      _id: updatedUser.id,
+      id: updatedUser.studentProfile?.enrollmentNo,
+      name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+      email: updatedUser.email,
+      phone: updatedUser.phone || '',
+      department: deptName,
+      semester: '1st Semester',
+      status: updatedUser.isActive ? 'Active' : 'Suspended'
+    }
+  });
+});

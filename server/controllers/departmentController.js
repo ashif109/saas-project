@@ -1,63 +1,103 @@
 const prisma = require('../config/prisma');
+const asyncHandler = require('../utils/asyncHandler');
 
-exports.createDepartment = async (req, res) => {
-  try {
-    const { name, code } = req.body;
+exports.createDepartment = asyncHandler(async (req, res) => {
+  const { name, code } = req.body;
 
-    if (!name || !code) {
-      return res.status(400).json({ message: "Name and code are required." });
+  if (!name || !code) {
+    return res.status(400).json({ message: "Name and code are required." });
+  }
+
+  let collegeId = req.user?.college || req.user?.collegeId;
+  if (!collegeId) {
+    const firstCollege = await prisma.college.findFirst();
+    collegeId = firstCollege?.id;
+  }
+
+  if (!collegeId) return res.status(400).json({ message: "No college context found." });
+
+  const newDept = await prisma.department.create({
+    data: {
+      name,
+      code,
+      collegeId
     }
+  });
 
-    let collegeId = req.user?.college || req.user?.collegeId;
-    if (!collegeId) {
-      const firstCollege = await prisma.college.findFirst();
-      collegeId = firstCollege?.id;
-    }
+  res.status(201).json({
+    message: "Department created successfully",
+    department: newDept
+  });
+});
 
-    if (!collegeId) return res.status(400).json({ message: "No college context found." });
+exports.getDepartments = asyncHandler(async (req, res) => {
+  const { search = '' } = req.query;
 
-    const newDept = await prisma.department.create({
-      data: {
-        name,
-        code,
-        collegeId
+  let collegeId = req.user?.college || req.user?.collegeId;
+  if (!collegeId) {
+    const firstCollege = await prisma.college.findFirst();
+    collegeId = firstCollege?.id;
+  }
+
+  if (!collegeId) return res.status(200).json([]);
+
+  const where = { collegeId };
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { code: { contains: search, mode: 'insensitive' } }
+    ];
+  }
+
+  const depts = await prisma.department.findMany({
+    where,
+    include: {
+      _count: {
+        select: { faculties: true, courses: true }
       }
-    });
+    },
+    orderBy: { createdAt: 'desc' }
+  });
 
-    res.status(201).json({
-      message: "Department created successfully",
-      department: newDept
-    });
+  res.status(200).json(depts);
+});
 
-  } catch (error) {
-    console.error('Create Dept Error:', error);
-    res.status(500).json({ message: "Internal server error create department" });
+exports.updateDepartment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, code } = req.body;
+
+  const updatedDept = await prisma.department.update({
+    where: { id },
+    data: { name, code }
+  });
+
+  res.status(200).json({
+    message: "Department updated successfully",
+    department: updatedDept
+  });
+});
+
+exports.deleteDepartment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Check for dependencies before deleting
+  const dept = await prisma.department.findUnique({
+    where: { id },
+    include: { _count: { select: { faculties: true, courses: true } } }
+  });
+
+  if (dept._count.faculties > 0 || dept._count.courses > 0) {
+    return res.status(400).json({ 
+      message: "Cannot delete department with active faculty or courses. Please reassign them first." 
+    });
   }
-};
 
-exports.getDepartments = async (req, res) => {
-  try {
-    let collegeId = req.user?.college || req.user?.collegeId;
-    if (!collegeId) {
-      const firstCollege = await prisma.college.findFirst();
-      collegeId = firstCollege?.id;
-    }
+  await prisma.department.delete({
+    where: { id }
+  });
 
-    if (!collegeId) return res.status(200).json([]);
-
-    const depts = await prisma.department.findMany({
-      where: { collegeId },
-      include: {
-        _count: {
-          select: { faculties: true, courses: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.status(200).json(depts);
-  } catch (error) {
-    console.error('Fetch Depts Error:', error);
-    res.status(500).json({ message: "Internal server error fetching departments" });
-  }
-};
+  res.status(200).json({
+    message: "Department deleted successfully"
+  });
+});

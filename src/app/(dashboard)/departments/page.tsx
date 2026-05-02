@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Layers, BookOpen, Users, MoreVertical, Edit2, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Layers, BookOpen, Users, MoreVertical, Edit2, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { 
   Dialog, 
@@ -23,8 +23,19 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import Link from 'next/link';
 
 export default function DepartmentsPage() {
   const { toast } = useToast();
@@ -32,17 +43,22 @@ export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Dialog States
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedDept, setSelectedDept] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     name: '',
     code: ''
   });
 
-  const fetchDepts = async () => {
+  const fetchDepts = useCallback(async (search = '') => {
     setLoading(true);
     try {
-      const res = await api.get('/api/departments');
+      const res = await api.get('/api/departments', { params: { search } });
       setDepartments(res.data);
     } catch (err) {
       console.error(err);
@@ -54,24 +70,35 @@ export default function DepartmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchDepts();
-  }, []);
+  }, [fetchDepts]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchDepts(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, fetchDepts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post('/api/departments', formData);
-      toast({
-        title: "Success",
-        description: "Department created successfully.",
-      });
+      if (editOpen && selectedDept) {
+        await api.put(`/api/departments/${selectedDept.id}`, formData);
+        toast({ title: "Updated", description: "Department updated successfully." });
+      } else {
+        await api.post('/api/departments', formData);
+        toast({ title: "Success", description: "Department created successfully." });
+      }
       setOpen(false);
+      setEditOpen(false);
       setFormData({ name: '', code: '' });
-      fetchDepts();
+      fetchDepts(searchTerm);
     } catch (err: any) {
       toast({
         title: "Failed",
@@ -83,10 +110,35 @@ export default function DepartmentsPage() {
     }
   };
 
-  const filteredDepts = departments.filter(d => 
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDelete = async () => {
+    if (!selectedDept) return;
+    setSubmitting(true);
+    try {
+      await api.delete(`/api/departments/${selectedDept.id}`);
+      toast({ title: "Deleted", description: "Department removed successfully." });
+      fetchDepts(searchTerm);
+    } catch (err: any) {
+      toast({
+        title: "Delete Failed",
+        description: err.response?.data?.message || "Could not delete department.",
+        variant: "destructive"
+      });
+    } finally {
+      setSubmitting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const openEdit = (dept: any) => {
+    setSelectedDept(dept);
+    setFormData({ name: dept.name, code: dept.code });
+    setEditOpen(true);
+  };
+
+  const openDelete = (dept: any) => {
+    setSelectedDept(dept);
+    setDeleteDialogOpen(true);
+  };
 
   return (
     <DashboardLayout>
@@ -98,7 +150,7 @@ export default function DepartmentsPage() {
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20">
+              <Button onClick={() => { setSelectedDept(null); setFormData({ name: '', code: '' }); }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20">
                 <Plus className="h-4 w-4 mr-2" /> Add Department
               </Button>
             </DialogTrigger>
@@ -144,6 +196,58 @@ export default function DepartmentsPage() {
           </Dialog>
         </div>
 
+        {/* Edit Dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <form onSubmit={handleSubmit}>
+              <DialogHeader>
+                <DialogTitle>Edit Department</DialogTitle>
+                <DialogDescription>Modify department details.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-6 py-6">
+                <div className="space-y-2">
+                  <Label>Department Name</Label>
+                  <Input 
+                    required 
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Department Code</Label>
+                  <Input 
+                    required 
+                    value={formData.code}
+                    onChange={(e) => setFormData({...formData, code: e.target.value})}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={submitting} className="bg-blue-600">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the <strong>{selectedDept?.name}</strong> department.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-rose-600 hover:bg-rose-700">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Delete Department
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
@@ -154,19 +258,19 @@ export default function DepartmentsPage() {
           />
         </div>
 
-        {loading ? (
+        {loading && departments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
             <Loader2 className="h-8 w-8 animate-spin mb-4 text-blue-500" />
             <p>Loading institutional structure...</p>
           </div>
-        ) : filteredDepts.length === 0 ? (
+        ) : departments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500">
             <Layers className="h-10 w-10 mb-2 opacity-20" />
-            <p>No departments configured yet.</p>
+            <p>No departments found.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDepts.map((dept) => (
+            {departments.map((dept) => (
               <Card key={dept.id} className="border-none shadow-xl shadow-slate-200/50 hover:shadow-blue-500/10 transition-all group overflow-hidden bg-white/80 backdrop-blur-sm">
                 <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <CardHeader className="pb-4">
@@ -181,8 +285,8 @@ export default function DepartmentsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem><Edit2 className="h-4 w-4 mr-2" /> Edit Details</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" /> Delete</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEdit(dept)}><Edit2 className="h-4 w-4 mr-2" /> Edit Details</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openDelete(dept)} className="text-destructive"><Trash2 className="h-4 w-4 mr-2" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -205,9 +309,9 @@ export default function DepartmentsPage() {
                     <span className="font-bold text-slate-700">{dept._count?.courses || 0} Degrees</span>
                   </div>
                   <div className="pt-4 border-t border-slate-100 flex justify-end items-center">
-                    <Button variant="link" size="sm" className="h-auto p-0 text-blue-600 font-bold hover:text-blue-700">
+                    <Link href="/academic-setup" className="text-blue-600 text-sm font-bold hover:text-blue-700 flex items-center">
                       Manage Curriculum &rarr;
-                    </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
