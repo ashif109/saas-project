@@ -221,3 +221,112 @@ exports.getDashboardSummary = async (req, res) => {
     res.status(500).json({ message: "Failed to load dashboard data" });
   }
 };
+
+exports.getFacultyDashboardSummary = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { facultyProfile: true }
+    });
+
+    if (!user || !user.facultyProfile) {
+      return res.status(404).json({ message: "Faculty profile not found" });
+    }
+
+    const facultyId = user.facultyProfile.id;
+
+    // 1. Today's Classes
+    const today = new Date();
+    const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+    const todayStart = new Date(today.setHours(0, 0, 0, 0));
+    const todayEnd = new Date(today.setHours(23, 59, 59, 999));
+
+    const todaysSchedule = await prisma.timetableEntry.findMany({
+      where: {
+        facultyId: facultyId,
+        dayOfWeek: dayName
+      },
+      include: {
+        subject: true,
+        batch: {
+          include: {
+            course: true
+          }
+        }
+      },
+      orderBy: {
+        startTime: 'asc'
+      }
+    });
+
+    const todaysClassesCount = todaysSchedule.length;
+
+    // 2. Pending Assignments (due date >= today and created by this faculty)
+    const pendingAssignmentsCount = await prisma.assignment.count({
+      where: {
+        facultyId: facultyId,
+        dueDate: {
+          gte: todayStart
+        }
+      }
+    });
+
+    // 3. Unresolved Doubts (assigned to this faculty, status OPEN)
+    const unresolvedDoubtsCount = await prisma.doubt.count({
+      where: {
+        facultyId: facultyId,
+        status: 'OPEN'
+      }
+    });
+
+    // 4. Attendance Marked (count of today's classes where attendance has been marked by this faculty)
+    // We check if attendance records exist for the subjects and batches in today's schedule for today's date
+    let attendanceMarkedCount = 0;
+    
+    // Batch the queries or do a simple loop since it's limited per day
+    for (const entry of todaysSchedule) {
+      if (entry.subjectId) {
+        const attendanceExists = await prisma.attendance.findFirst({
+          where: {
+            subjectId: entry.subjectId,
+            batchId: entry.batchId,
+            date: {
+              gte: todayStart,
+              lte: todayEnd
+            }
+          }
+        });
+        if (attendanceExists) {
+          attendanceMarkedCount++;
+        }
+      }
+    }
+
+    // Format the schedule for the frontend
+    const scheduleFormatted = todaysSchedule.map(cls => ({
+      time: `${cls.startTime} - ${cls.endTime}`,
+      subject: cls.subject?.name || 'Unknown Subject',
+      room: cls.roomInfo || 'TBD',
+      batch: `${cls.batch.course.name} - ${cls.batch.name}`
+    }));
+
+    res.status(200).json({
+      stats: {
+        todaysClasses: todaysClassesCount,
+        pendingAssignments: pendingAssignmentsCount,
+        unresolvedDoubts: unresolvedDoubtsCount,
+        attendanceMarked: `${attendanceMarkedCount}/${todaysClassesCount}`
+      },
+      schedule: scheduleFormatted
+    });
+
+  } catch (error) {
+    console.error('Faculty Dashboard Error:', error);
+    res.status(500).json({ message: "Failed to load faculty dashboard data" });
+  }
+};
