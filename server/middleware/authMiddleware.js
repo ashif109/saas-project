@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
-const prisma = require('../config/prisma');
+const User = require('../models/User');
 
 const protect = asyncHandler(async (req, res, next) => {
   let token;
@@ -14,9 +14,7 @@ const protect = asyncHandler(async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Get user from the token
-      req.user = await prisma.user.findUnique({
-        where: { id: decoded.id }
-      });
+      req.user = await User.findById(decoded.id).select('-password');
 
       if (!req.user) {
         res.status(401);
