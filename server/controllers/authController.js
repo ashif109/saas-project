@@ -5,6 +5,8 @@ const SystemSettings = require('../models/SystemSettings');
 const { sendPasswordResetOtp } = require('../services/emailService');
 const crypto = require('crypto');
 const { createLog } = require('./logController');
+const prisma = require('../config/prisma');
+const bcrypt = require('bcryptjs');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -14,10 +16,13 @@ const login = asyncHandler(async (req, res) => {
   const { password } = req.body;
   console.log('Login attempt for:', email);
 
-  const user = await User.findOne({ email }).populate('college');
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { college: true }
+  });
 
   if (!user) {
-    console.log('User not found in DB');
+    console.log('User not found in DB via Prisma');
     await createLog({
       action: 'Login Failure',
       module: 'Auth',
@@ -31,7 +36,7 @@ const login = asyncHandler(async (req, res) => {
     throw new Error('Invalid email or password');
   }
 
-  const isMatch = await user.matchPassword(password);
+  const isMatch = await bcrypt.compare(password, user.password);
   console.log('Password match:', isMatch);
 
   if (isMatch) {
@@ -41,7 +46,7 @@ const login = asyncHandler(async (req, res) => {
     const timeoutMinutes = parseInt(settings.sessionTimeout) || 60;
 
     await createLog({
-      user: user._id,
+      user: user.id,
       userName: user.name || `${user.firstName} ${user.lastName}`,
       userEmail: user.email,
       action: 'Login Success',
@@ -52,7 +57,7 @@ const login = asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent']
     });
     res.json({
-      _id: user._id,
+      _id: user.id,
       name: user.name || `${user.firstName} ${user.lastName}`,
       email: user.email,
       role: user.role,
@@ -60,14 +65,14 @@ const login = asyncHandler(async (req, res) => {
       phone: user.phone,
       college: user.college,
       token: generateToken({ 
-        id: user._id, 
+        id: user.id, 
         role: user.role, 
-        collegeId: user.college?._id || user.college 
+        collegeId: user.collegeId || user.college?.id 
       }, timeoutMinutes),
     });
   } else {
     await createLog({
-      user: user._id,
+      user: user.id,
       userName: user.name || `${user.firstName} ${user.lastName}`,
       userEmail: user.email,
       action: 'Login Failure',
@@ -86,11 +91,14 @@ const login = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 const getProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate('college');
+  const user = await prisma.user.findUnique({
+    where: { id: req.user._id || req.user.id },
+    include: { college: true }
+  });
 
   if (user) {
     res.json({
-      _id: user._id,
+      _id: user.id,
       name: user.name || `${user.firstName} ${user.lastName}`,
       email: user.email,
       role: user.role,
@@ -100,7 +108,7 @@ const getProfile = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(404);
-    throw new Error('User found');
+    throw new Error('User not found');
   }
 });
 
@@ -108,9 +116,11 @@ const getProfile = asyncHandler(async (req, res) => {
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const userId = req.user._id || req.user.id;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (user) {
+    let hashedPassword = user.password;
     // If updating password, verify current password first
     if (req.body.password) {
       if (!req.body.currentPassword) {
@@ -118,7 +128,7 @@ const updateProfile = asyncHandler(async (req, res) => {
         throw new Error('Current password is required to set a new password');
       }
 
-      const isMatch = await user.matchPassword(req.body.currentPassword);
+      const isMatch = await bcrypt.compare(req.body.currentPassword, user.password);
       if (!isMatch) {
         res.status(401);
         throw new Error('Current password is incorrect');
@@ -133,22 +143,32 @@ const updateProfile = asyncHandler(async (req, res) => {
         res.status(400);
         throw new Error(`Password must be at least ${minLength} characters long`);
       }
-      user.password = req.body.password;
+      hashedPassword = await bcrypt.hash(req.body.password, 10);
     }
 
-    user.name = req.body.name || user.name;
-    if (req.body.email) {
-      user.email = req.body.email.trim().toLowerCase();
-    }
-    user.avatar = req.body.avatar || user.avatar;
-    user.phone = req.body.phone || user.phone;
+    const name = req.body.name || user.name;
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
-    const updatedUser = await user.save();
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        firstName,
+        lastName,
+        email: req.body.email ? req.body.email.trim().toLowerCase() : user.email,
+        avatar: req.body.avatar || user.avatar,
+        phone: req.body.phone || user.phone,
+        password: hashedPassword
+      },
+      include: { college: true }
+    });
 
     await createLog({
-      user: user._id,
-      userName: user.name,
-      userEmail: user.email,
+      user: user.id,
+      userName: updatedUser.name,
+      userEmail: updatedUser.email,
       action: 'Profile Updated',
       module: 'Auth',
       details: `User updated their profile${req.body.password ? ' and password' : ''}`,
@@ -158,7 +178,7 @@ const updateProfile = asyncHandler(async (req, res) => {
     });
 
     res.json({
-      _id: updatedUser._id,
+      _id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
@@ -166,9 +186,9 @@ const updateProfile = asyncHandler(async (req, res) => {
       phone: updatedUser.phone,
       college: updatedUser.college,
       token: generateToken({ 
-        id: updatedUser._id, 
+        id: updatedUser.id, 
         role: updatedUser.role, 
-        collegeId: updatedUser.college?._id || updatedUser.college 
+        collegeId: updatedUser.collegeId || updatedUser.college?.id 
       }),
     });
   } else {
@@ -182,7 +202,7 @@ const updateProfile = asyncHandler(async (req, res) => {
 // @access  Public
 const forgotPassword = asyncHandler(async (req, res) => {
   const email = req.body.email ? req.body.email.trim().toLowerCase() : '';
-  const user = await User.findOne({ email });
+  const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
     await createLog({
@@ -202,16 +222,20 @@ const forgotPassword = asyncHandler(async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   
   // Set OTP and expiry (10 mins)
-  user.resetPasswordOTP = otp;
-  user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
-  await user.save();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+        resetPasswordOTP: otp,
+        resetPasswordExpires: new Date(Date.now() + 10 * 60 * 1000)
+    }
+  });
 
   console.log('Sending password reset OTP to:', email);
   try {
     await sendPasswordResetOtp(user.email, otp);
     console.log('Password reset OTP sent successfully to:', user.email);
     await createLog({
-      user: user._id,
+      user: user.id,
       userName: user.name,
       userEmail: user.email,
       action: 'Forgot Password Request',
@@ -231,9 +255,13 @@ const forgotPassword = asyncHandler(async (req, res) => {
       user: process.env.SMTP_USER
     });
     
-    user.resetPasswordOTP = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
+    await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            resetPasswordOTP: null,
+            resetPasswordExpires: null
+        }
+    });
     
     res.status(500);
     throw new Error(`Email service failed: ${emailError.message}. Check SMTP configuration.`);
@@ -246,10 +274,12 @@ const forgotPassword = asyncHandler(async (req, res) => {
 const verifyOTP = asyncHandler(async (req, res) => {
   const email = req.body.email ? req.body.email.trim().toLowerCase() : '';
   const { otp } = req.body;
-  const user = await User.findOne({
-    email,
-    resetPasswordOTP: otp,
-    resetPasswordExpires: { $gt: Date.now() }
+  const user = await prisma.user.findFirst({
+    where: {
+      email,
+      resetPasswordOTP: otp,
+      resetPasswordExpires: { gt: new Date() }
+    }
   });
 
   if (!user) {
@@ -267,7 +297,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
   }
 
   await createLog({
-    user: user._id,
+    user: user.id,
     userName: user.name,
     userEmail: user.email,
     action: 'OTP Verified',
@@ -286,10 +316,12 @@ const verifyOTP = asyncHandler(async (req, res) => {
 const resetPassword = asyncHandler(async (req, res) => {
   const email = req.body.email ? req.body.email.trim().toLowerCase() : '';
   const { otp, password } = req.body;
-  const user = await User.findOne({
-    email,
-    resetPasswordOTP: otp,
-    resetPasswordExpires: { $gt: Date.now() }
+  const user = await prisma.user.findFirst({
+    where: {
+      email,
+      resetPasswordOTP: otp,
+      resetPasswordExpires: { gt: new Date() }
+    }
   });
 
   if (!user) {
@@ -307,13 +339,18 @@ const resetPassword = asyncHandler(async (req, res) => {
     throw new Error(`Password must be at least ${minLength} characters long`);
   }
 
-  user.password = password;
-  user.resetPasswordOTP = undefined;
-  user.resetPasswordExpires = undefined;
-  await user.save();
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+        password: hashedPassword,
+        resetPasswordOTP: null,
+        resetPasswordExpires: null
+    }
+  });
 
   await createLog({
-    user: user._id,
+    user: user.id,
     userName: user.name,
     userEmail: user.email,
     action: 'Password Reset Success',
@@ -330,7 +367,10 @@ const resetPassword = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/impersonate/:userId
 // @access  Private/SuperAdmin
 const impersonateUser = asyncHandler(async (req, res) => {
-  const targetUser = await User.findById(req.params.userId).populate('college');
+  const targetUser = await prisma.user.findUnique({
+    where: { id: req.params.userId },
+    include: { college: true }
+  });
 
   if (!targetUser) {
     res.status(404);
@@ -339,7 +379,7 @@ const impersonateUser = asyncHandler(async (req, res) => {
 
   // Log the impersonation
   await createLog({
-    user: req.user._id,
+    user: req.user._id || req.user.id,
     userName: req.user.name,
     userEmail: req.user.email,
     action: 'Impersonation Started',
@@ -351,20 +391,20 @@ const impersonateUser = asyncHandler(async (req, res) => {
   });
 
   res.json({
-    _id: targetUser._id,
-    name: targetUser.name,
+    _id: targetUser.id,
+    name: targetUser.name || `${targetUser.firstName} ${targetUser.lastName}`,
     email: targetUser.email,
     role: targetUser.role,
     avatar: targetUser.avatar,
     phone: targetUser.phone,
     college: targetUser.college,
     token: generateToken({ 
-      id: targetUser._id, 
+      id: targetUser.id, 
       role: targetUser.role, 
-      collegeId: targetUser.college?._id || targetUser.college 
+      collegeId: targetUser.collegeId || targetUser.college?.id 
     }),
     isImpersonating: true,
-    originalAdminId: req.user._id
+    originalAdminId: req.user._id || req.user.id
   });
 });
 
