@@ -56,15 +56,23 @@ exports.getTimetable = async (req, res) => {
     }
 
     if (req.user?.role === 'FACULTY') {
+      const userId = req.user._id || req.user.id;
+      console.log("DEBUG: Timetable fetch for Faculty User ID:", userId);
+
       const user = await prisma.user.findUnique({
-        where: { id: req.user._id ? req.user._id.toString() : req.user.id },
+        where: { id: userId.toString() },
         include: { facultyProfile: true }
       });
+
       if (user?.facultyProfile) {
+        console.log("DEBUG: Filtering timetable by Faculty ID:", user.facultyProfile.id);
         where.facultyId = user.facultyProfile.id;
-        // When filtering by faculty, we can relax the batch filter 
+        // When filtering by faculty, we relax the batch filter 
         // to ensure they see all their assigned classes across any batch
+        delete where.batchId;
         delete where.batch;
+      } else {
+          console.log("DEBUG: Faculty profile NOT FOUND for user:", userId);
       }
     }
 

@@ -58,7 +58,7 @@ exports.enrollStudent = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Request body is missing" });
   }
 
-  const { name, email, department, semester } = req.body;
+  const { name, email, department, semester, batchId } = req.body;
   
   if (!name || !email) {
     return res.status(400).json({ message: "Name and email are required fields." });
@@ -75,7 +75,14 @@ exports.enrollStudent = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Email is already registered." });
   }
 
-  const batch = await ensureDefaultBatch(collegeId);
+  let batch;
+  if (batchId) {
+    batch = await prisma.batch.findUnique({ where: { id: batchId } });
+  }
+  
+  if (!batch) {
+    batch = await ensureDefaultBatch(collegeId);
+  }
 
   const nameParts = name.trim().split(' ');
   const firstName = nameParts[0];
@@ -222,7 +229,7 @@ exports.getStudents = asyncHandler(async (req, res) => {
 });
 
 exports.bulkEnrollStudents = asyncHandler(async (req, res) => {
-  const { students } = req.body; 
+  const { students, batchId } = req.body; 
   
   if (!students || !Array.isArray(students)) {
     return res.status(400).json({ message: "Invalid students data" });
@@ -234,7 +241,14 @@ exports.bulkEnrollStudents = asyncHandler(async (req, res) => {
     collegeId = firstCollege?.id;
   }
 
-  const batch = await ensureDefaultBatch(collegeId);
+  let batch;
+  if (batchId) {
+    batch = await prisma.batch.findUnique({ where: { id: batchId } });
+  }
+  
+  if (!batch) {
+    batch = await ensureDefaultBatch(collegeId);
+  }
   const defaultPassword = 'Student@123';
   const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 

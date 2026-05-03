@@ -13,10 +13,22 @@ const protect = asyncHandler(async (req, res, next) => {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Get user from the token
-      req.user = await User.findById(decoded.id).select('-password');
+      // Attach context to request
+      req.user = {
+        id: decoded.id,
+        _id: decoded.id, // For Mongoose compatibility
+        role: decoded.role,
+        collegeId: decoded.collegeId,
+        college: decoded.collegeId // For Mongoose compatibility
+      };
 
-      if (!req.user) {
+      // Optional: If full user object is needed (some controllers might rely on it)
+      // but let's see if we can avoid it. For now, let's fetch to be safe but 
+      // most logic will use the decoded fields.
+      const user = await User.findById(decoded.id).select('-password');
+      if (user) {
+          req.user = { ...req.user, ...user.toObject() };
+      } else {
         res.status(401);
         throw new Error('Not authorized, user not found');
       }

@@ -126,7 +126,16 @@ export default function FacultyDashboardPage() {
                 <CardContent>
                   <div className="space-y-4">
                     {!dashboardData?.schedule?.length ? (
-                      <p className="text-slate-500 text-center py-4">No classes scheduled for today.</p>
+                      <div className="text-center py-10 space-y-3">
+                        <p className="text-slate-500">No classes scheduled for today.</p>
+                        <div className="pt-4 mt-4 border-t border-slate-100 text-[10px] text-slate-400 font-mono text-left max-w-xs mx-auto overflow-hidden">
+                          <p className="font-bold text-slate-500 mb-1 uppercase tracking-widest">Debug Info</p>
+                          <p>Role: {user?.role || 'None'}</p>
+                          <p>User ID: {user?.id?.substring(0, 8)}...</p>
+                          <p>College: {user?.collegeId || user?.college?.substring(0, 8) || 'None'}</p>
+                          <p className="mt-1 text-blue-400 italic">Verify admin has assigned classes to your Faculty ID.</p>
+                        </div>
+                      </div>
                     ) : (
                       dashboardData.schedule.map((cls, idx) => (
                         <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:border-blue-100 hover:bg-blue-50/50 transition-colors">

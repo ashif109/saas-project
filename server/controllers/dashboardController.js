@@ -224,25 +224,34 @@ exports.getDashboardSummary = async (req, res) => {
 
 exports.getFacultyDashboardSummary = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id || req.user?._id;
     if (!userId) {
+      console.log("DEBUG: No userId in req.user", req.user);
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    const userIdStr = userId.toString();
+    console.log("DEBUG: Fetching faculty profile for userId:", userIdStr);
+
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: userIdStr },
       include: { facultyProfile: true }
     });
 
     if (!user || !user.facultyProfile) {
+      console.log("DEBUG: Faculty profile not found for user:", userIdStr);
       return res.status(404).json({ message: "Faculty profile not found" });
     }
 
     const facultyId = user.facultyProfile.id;
+    console.log("DEBUG: Found Faculty ID:", facultyId);
 
     // 1. Today's Classes
     const today = new Date();
+    // Normalize day name to match "Monday", "Tuesday", etc.
     const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+    console.log("DEBUG: Checking schedule for day:", dayName);
+
     const todayStart = new Date(today.setHours(0, 0, 0, 0));
     const todayEnd = new Date(today.setHours(23, 59, 59, 999));
 

@@ -24,7 +24,7 @@ model User {
   isActive       Boolean   @default(true)
   
   // To handle multi-tenant isolation
-  collegeId      String?   @db.ObjectId
+  collegeId      String?   @map("college") @db.ObjectId
   college        College?  @relation("CollegeUsers", fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   
   userRoles      UserRole[]

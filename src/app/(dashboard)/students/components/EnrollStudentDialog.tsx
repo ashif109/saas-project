@@ -27,12 +27,29 @@ import api from '@/lib/axios';
 export function EnrollStudentDialog({ onStudentEnrolled }: { onStudentEnrolled: (student: any) => void }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [batches, setBatches] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     department: '',
-    semester: ''
+    semester: '',
+    batchId: ''
   });
+
+  const fetchBatches = async () => {
+    try {
+      const res = await api.get('/api/setup/batches');
+      setBatches(res.data || []);
+    } catch (err) {
+      console.error('Fetch Batches error:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isDialogOpen) {
+      fetchBatches();
+    }
+  }, [isDialogOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +72,7 @@ export function EnrollStudentDialog({ onStudentEnrolled }: { onStudentEnrolled: 
       setTimeout(() => {
         onStudentEnrolled(newStudent);
         toast.success(res.data.message || 'Student Enrolled successfully!');
-        setFormData({ name: '', email: '', department: '', semester: '' });
+        setFormData({ name: '', email: '', department: '', semester: '', batchId: '' });
       }, 150);
       
     } catch (error: any) {
@@ -124,6 +141,19 @@ export function EnrollStudentDialog({ onStudentEnrolled }: { onStudentEnrolled: 
                   <SelectItem value="me">Mechanical</SelectItem>
                   <SelectItem value="civil">Civil Engineering</SelectItem>
                   <SelectItem value="ee">Electrical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sbatch">Academic Batch <span className="text-destructive">*</span></Label>
+              <Select required value={formData.batchId} onValueChange={(val) => setFormData({...formData, batchId: val})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {batches.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

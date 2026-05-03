@@ -59,7 +59,11 @@ const login = asyncHandler(async (req, res) => {
       avatar: user.avatar,
       phone: user.phone,
       college: user.college,
-      token: generateToken(user._id, timeoutMinutes),
+      token: generateToken({ 
+        id: user._id, 
+        role: user.role, 
+        collegeId: user.college?._id || user.college 
+      }, timeoutMinutes),
     });
   } else {
     await createLog({
@@ -161,7 +165,11 @@ const updateProfile = asyncHandler(async (req, res) => {
       avatar: updatedUser.avatar,
       phone: updatedUser.phone,
       college: updatedUser.college,
-      token: generateToken(updatedUser._id),
+      token: generateToken({ 
+        id: updatedUser._id, 
+        role: updatedUser.role, 
+        collegeId: updatedUser.college?._id || updatedUser.college 
+      }),
     });
   } else {
     res.status(404);
@@ -350,15 +358,19 @@ const impersonateUser = asyncHandler(async (req, res) => {
     avatar: targetUser.avatar,
     phone: targetUser.phone,
     college: targetUser.college,
-    token: generateToken(targetUser._id),
+    token: generateToken({ 
+      id: targetUser._id, 
+      role: targetUser.role, 
+      collegeId: targetUser.college?._id || targetUser.college 
+    }),
     isImpersonating: true,
     originalAdminId: req.user._id
   });
 });
 
-const generateToken = (id, expiresInMinutes) => {
+const generateToken = (payload, expiresInMinutes) => {
   const expiresIn = expiresInMinutes ? `${expiresInMinutes}m` : '30d';
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn,
   });
 };

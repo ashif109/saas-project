@@ -35,16 +35,21 @@ exports.getFacultySetup = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    const userId = req.user._id || req.user.id;
+    console.log("DEBUG: Attendance Setup for User ID:", userId);
+
     const user = await prisma.user.findUnique({
-      where: { id: req.user._id ? req.user._id.toString() : req.user.id },
+      where: { id: userId.toString() },
       include: { facultyProfile: true }
     });
 
     if (!user?.facultyProfile) {
+      console.log("DEBUG: Faculty profile not found for user:", userId);
       return res.status(404).json({ message: "Faculty profile not found" });
     }
 
     const facultyId = user.facultyProfile.id;
+    console.log("DEBUG: Found Faculty ID for attendance:", facultyId);
 
     const entries = await prisma.timetableEntry.findMany({
       where: { facultyId },
