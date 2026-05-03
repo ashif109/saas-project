@@ -85,4 +85,4 @@ collegeSchema.index({ status: 1 });
 collegeSchema.index({ 'subscription.status': 1 });
 collegeSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('College', collegeSchema);
+module.exports = mongoose.model('College', collegeSchema, 'College');

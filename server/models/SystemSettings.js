@@ -44,4 +44,4 @@ const systemSettingsSchema = mongoose.Schema({
   timestamps: true
 });
 
-module.exports = mongoose.model('SystemSettings', systemSettingsSchema);
+module.exports = mongoose.model('SystemSettings', systemSettingsSchema, 'SystemSettings');
