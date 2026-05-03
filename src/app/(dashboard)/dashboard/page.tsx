@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useRouter } from 'next/navigation';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { SmartAnalytics } from '@/components/dashboard/SmartAnalytics';
 import { ActionCenter } from '@/components/dashboard/ActionCenter';
@@ -19,6 +20,14 @@ export default function DashboardPage() {
   const { user } = useAuthStore();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user?.role === 'FACULTY') {
+      router.push('/faculty-panel');
+    }
+  }, [user, router]);
 
   const fetchDashboardData = async () => {
     try {

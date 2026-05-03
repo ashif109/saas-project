@@ -75,7 +75,11 @@ export default function LoginPage() {
         collegeId: user.college?._id
       }, token);
 
-      router.push('/dashboard');
+      if (user.role === 'FACULTY') {
+        router.push('/faculty-panel');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
