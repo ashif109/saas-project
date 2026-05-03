@@ -13,7 +13,7 @@ const bcrypt = require('bcryptjs');
 // @access  Public
 const login = asyncHandler(async (req, res) => {
   const email = req.body.email ? req.body.email.trim().toLowerCase() : '';
-  const { password } = req.body;
+  const password = req.body.password ? req.body.password.trim() : '';
   console.log('Login attempt for:', email);
 
   const user = await prisma.user.findUnique({
