@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
-const User = require('../models/User');
+const prisma = require('../config/prisma');
 
 const protect = asyncHandler(async (req, res, next) => {
   let token;
@@ -25,9 +25,18 @@ const protect = asyncHandler(async (req, res, next) => {
       // Optional: If full user object is needed (some controllers might rely on it)
       // but let's see if we can avoid it. For now, let's fetch to be safe but 
       // most logic will use the decoded fields.
-      const user = await User.findById(decoded.id).select('-password');
+      const user = await prisma.user.findUnique({
+          where: { id: decoded.id },
+          include: { college: true }
+      });
       if (user) {
-          req.user = { ...req.user, ...user.toObject() };
+          req.user = { 
+            ...user,
+            _id: user.id, // For Mongoose compatibility
+            id: user.id,
+            collegeId: user.collegeId,
+            college: user.collegeId // For Mongoose compatibility
+          };
       } else {
         res.status(401);
         throw new Error('Not authorized, user not found');
