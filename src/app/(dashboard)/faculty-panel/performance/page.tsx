@@ -10,17 +10,56 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 
+import api from '@/lib/axios';
+import { toast } from 'sonner';
+
 export default function PerformanceTrackerPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBatch, setSelectedBatch] = useState('b1');
+  const [selectedBatch, setSelectedBatch] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [students, setStudents] = useState<any[]>([]);
 
-  const students = [
-    { id: '1', name: 'Alex Johnson', enrollment: 'CS23001', attendance: 85, marksAvg: 78, status: 'Good' },
-    { id: '2', name: 'Sarah Williams', enrollment: 'CS23002', attendance: 65, marksAvg: 82, status: 'At Risk (Attendance)' },
-    { id: '3', name: 'Michael Brown', enrollment: 'CS23003', attendance: 90, marksAvg: 45, status: 'At Risk (Marks)' },
-    { id: '4', name: 'Emily Davis', enrollment: 'CS23004', attendance: 72, marksAvg: 58, status: 'Warning' },
-    { id: '5', name: 'James Wilson', enrollment: 'CS23005', attendance: 95, marksAvg: 92, status: 'Excellent' },
-  ];
+  React.useEffect(() => {
+    const fetchSetup = async () => {
+      try {
+        const res = await api.get('/api/attendance/faculty-setup');
+        setBatches(res.data.batches || []);
+        setSubjects(res.data.subjects || []);
+        if (res.data.batches?.length) setSelectedBatch(res.data.batches[0].id);
+        if (res.data.subjects?.length) setSelectedSubject(res.data.subjects[0].id);
+      } catch (err) {
+        toast.error("Failed to fetch setup data");
+      }
+    };
+    fetchSetup();
+  }, []);
+
+  const fetchPerformance = async () => {
+    if (!selectedBatch || !selectedSubject) return;
+    setLoading(true);
+    try {
+      const res = await api.get(`/api/faculty/performance?batchId=${selectedBatch}&subjectId=${selectedSubject}`);
+      setAnalytics(res.data.summary);
+      setStudents(res.data.roster);
+    } catch (error) {
+      toast.error("Failed to load performance data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchPerformance();
+  }, [selectedBatch, selectedSubject]);
+
+  const filteredStudents = students.filter(s => 
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.enrollment.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <DashboardLayout>
@@ -30,13 +69,20 @@ export default function PerformanceTrackerPage() {
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Performance Tracker</h1>
             <p className="text-slate-500">Analyze attendance trends and identify at-risk students.</p>
           </div>
-          <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-            <SelectTrigger className="w-64 h-11 bg-white"><SelectValue placeholder="Select Batch" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="b1">CS 2nd Year (Data Structures)</SelectItem>
-              <SelectItem value="b2">IT 3rd Year (Algorithms)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-4">
+            <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+              <SelectTrigger className="w-48 h-11 bg-white"><SelectValue placeholder="Batch" /></SelectTrigger>
+              <SelectContent>
+                {batches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+              <SelectTrigger className="w-48 h-11 bg-white"><SelectValue placeholder="Subject" /></SelectTrigger>
+              <SelectContent>
+                {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -45,7 +91,7 @@ export default function PerformanceTrackerPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-semibold text-slate-500 mb-1">Class Avg Attendance</p>
-                  <h3 className="text-3xl font-black text-slate-800">81.4%</h3>
+                  <h3 className="text-3xl font-black text-slate-800">{analytics?.avgAttendance || 0}%</h3>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -59,7 +105,7 @@ export default function PerformanceTrackerPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-semibold text-slate-500 mb-1">Class Avg Marks</p>
-                  <h3 className="text-3xl font-black text-slate-800">71.0%</h3>
+                  <h3 className="text-3xl font-black text-slate-800">{analytics?.avgMarks || 0}%</h3>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
                   <Activity className="h-5 w-5 text-indigo-600" />
@@ -73,7 +119,7 @@ export default function PerformanceTrackerPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-semibold text-rose-600 mb-1">Attendance Defaulters</p>
-                  <h3 className="text-3xl font-black text-rose-700">2 <span className="text-sm font-medium opacity-70">below 75%</span></h3>
+                  <h3 className="text-3xl font-black text-rose-700">{analytics?.attendanceDefaulters || 0} <span className="text-sm font-medium opacity-70">below 75%</span></h3>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-rose-200 flex items-center justify-center">
                   <AlertTriangle className="h-5 w-5 text-rose-600" />
@@ -87,7 +133,7 @@ export default function PerformanceTrackerPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-semibold text-amber-600 mb-1">Academic Warning</p>
-                  <h3 className="text-3xl font-black text-amber-700">1 <span className="text-sm font-medium opacity-70">below 50%</span></h3>
+                  <h3 className="text-3xl font-black text-amber-700">{analytics?.academicWarnings || 0} <span className="text-sm font-medium opacity-70">below 50%</span></h3>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-amber-200 flex items-center justify-center">
                   <TrendingDown className="h-5 w-5 text-amber-600" />
@@ -123,7 +169,7 @@ export default function PerformanceTrackerPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {students.map((student) => (
+                  {filteredStudents.map((student) => (
                     <tr key={student.id} className="hover:bg-slate-50/50 group">
                       <td className="p-4 pl-6">
                         <div className="flex items-center gap-3">

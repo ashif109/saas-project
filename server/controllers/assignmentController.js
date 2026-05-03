@@ -42,7 +42,8 @@ const getAssignments = asyncHandler(async (req, res) => {
         where: subjectId ? { subjectId } : {},
         include: {
             faculty: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
-            subject: { select: { name: true, code: true } }
+            subject: { select: { name: true, code: true } },
+            _count: { select: { submissions: true } }
         },
         orderBy: { dueDate: 'desc' }
     });

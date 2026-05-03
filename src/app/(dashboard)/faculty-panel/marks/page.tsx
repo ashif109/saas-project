@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
+import api from '@/lib/axios';
+
 export default function FacultyMarksPage() {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
@@ -20,25 +22,58 @@ export default function FacultyMarksPage() {
   const [examName, setExamName] = useState('');
   const [maxMarks, setMaxMarks] = useState('100');
 
+  const [batches, setBatches] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchSetup = async () => {
+      try {
+        const res = await api.get('/api/attendance/faculty-setup');
+        setBatches(res.data.batches || []);
+        setSubjects(res.data.subjects || []);
+      } catch (err) {
+        toast.error("Failed to fetch setup data");
+      }
+    };
+    fetchSetup();
+  }, []);
+
   const fetchStudents = async () => {
     if (!selectedBatch || !selectedSubject || !examName) return toast.error("Please fill all configuration fields");
     setLoading(true);
-    setTimeout(() => {
-      const mockStudents = [
-        { id: '1', name: 'Alex Johnson', enrollmentNo: 'CS23001' },
-        { id: '2', name: 'Sarah Williams', enrollmentNo: 'CS23002' },
-        { id: '3', name: 'Michael Brown', enrollmentNo: 'CS23003' },
-      ];
-      setStudents(mockStudents);
+    try {
+      const res = await api.get(`/api/attendance/students?batchId=${selectedBatch}`);
+      setStudents(res.data);
+      
+      // Fetch existing marks if any
+      const marksRes = await api.get(`/api/marks?subjectId=${selectedSubject}&batchId=${selectedBatch}&examName=${examName}`);
+      const existingMarks: Record<string, string> = {};
+      marksRes.data.data.forEach((m: any) => {
+          existingMarks[m.studentId] = m.marksObtained.toString();
+      });
+      setMarksData(existingMarks);
+    } catch (error) {
+      toast.error("Failed to load students or marks");
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   const handleSave = async () => {
+    if (!selectedSubject || !selectedBatch || !examName) return toast.error("Missing configuration");
     const savingToast = toast.loading("Saving marks...");
-    setTimeout(() => {
+    try {
+      await api.post('/api/marks/bulk', {
+          subjectId: selectedSubject,
+          batchId: selectedBatch,
+          examName,
+          maxMarks: parseFloat(maxMarks),
+          marksData
+      });
       toast.success("Internal marks saved successfully!", { id: savingToast });
-    }, 800);
+    } catch (error) {
+      toast.error("Failed to save marks", { id: savingToast });
+    }
   };
 
   return (
@@ -57,8 +92,7 @@ export default function FacultyMarksPage() {
                 <Select value={selectedBatch} onValueChange={setSelectedBatch}>
                   <SelectTrigger className="h-11"><SelectValue placeholder="Batch" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="b1">CS 2nd Year</SelectItem>
-                    <SelectItem value="b2">IT 3rd Year</SelectItem>
+                    {batches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -67,8 +101,7 @@ export default function FacultyMarksPage() {
                 <Select value={selectedSubject} onValueChange={setSelectedSubject}>
                   <SelectTrigger className="h-11"><SelectValue placeholder="Subject" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="s1">Data Structures</SelectItem>
-                    <SelectItem value="s2">Algorithms</SelectItem>
+                    {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

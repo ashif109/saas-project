@@ -2,25 +2,44 @@ const prisma = require('../config/prisma');
 
 exports.getAttendanceStats = async (req, res) => {
   try {
-    let collegeId = req.user?.college || req.user?.collegeId;
-    if (!collegeId) {
-        const firstCollege = await prisma.college.findFirst();
-        collegeId = firstCollege?.id;
+    const userId = req.user._id || req.user.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId.toString() },
+      include: { facultyProfile: true }
+    });
+
+    if (!user?.facultyProfile) {
+      return res.status(404).json({ message: "Faculty profile not found" });
     }
 
+    const facultyId = user.facultyProfile.id;
     const today = new Date();
-    const last5Days = [];
+    const stats = [];
+
     for (let i = 4; i >= 0; i--) {
         const d = new Date();
         d.setDate(today.getDate() - i);
-        last5Days.push(d.toISOString().split('T')[0]);
-    }
+        const dateStr = d.toISOString().split('T')[0];
+        
+        const dayAttendance = await prisma.attendance.findMany({
+            where: {
+                batch: { timetableEntries: { some: { facultyId } } },
+                date: {
+                    gte: new Date(new Date(d).setHours(0,0,0,0)),
+                    lt: new Date(new Date(d).setHours(23,59,59,999))
+                }
+            }
+        });
 
-    // Mocking some data for the chart if empty
-    const stats = last5Days.map(day => ({
-        name: new Date(day).toLocaleDateString('en-US', { weekday: 'short' }),
-        value: 85 + Math.floor(Math.random() * 10)
-    }));
+        const total = dayAttendance.length;
+        const present = dayAttendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
+        const percent = total > 0 ? Math.round((present / total) * 100) : 0;
+
+        stats.push({
+            name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+            value: percent
+        });
+    }
 
     res.status(200).json(stats);
   } catch (error) {

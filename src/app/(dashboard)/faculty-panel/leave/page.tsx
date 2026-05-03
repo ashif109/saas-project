@@ -12,17 +12,66 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+import api from '@/lib/axios';
+
 export default function FacultyLeavePage() {
   const [open, setOpen] = useState(false);
-  const [leaves, setLeaves] = useState([
-    { id: '1', startDate: '2026-06-15', endDate: '2026-06-18', reason: 'Attending AI Conference', status: 'APPROVED', substitute: 'Dr. Jane Smith' },
-    { id: '2', startDate: '2026-05-20', endDate: '2026-05-21', reason: 'Personal Emergency', status: 'PENDING', substitute: null }
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  const [colleagues, setColleagues] = useState<any[]>([]);
 
-  const handleApply = (e: React.FormEvent) => {
+  // Form State
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reason, setReason] = useState('');
+  const [selectedSubstitute, setSelectedSubstitute] = useState('');
+
+  const fetchLeaves = async () => {
+    try {
+      const res = await api.get('/api/leaves/my-leaves');
+      setLeaves(res.data.data);
+    } catch (err) {
+      toast.error("Failed to fetch leave history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLeaves();
+    
+    const fetchColleagues = async () => {
+        try {
+            const res = await api.get('/api/faculty');
+            setColleagues(res.data || []);
+        } catch (err) {
+            console.error("Failed to fetch colleagues");
+        }
+    };
+    fetchColleagues();
+  }, []);
+
+  const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Leave application submitted successfully for HOD approval.");
-    setOpen(false);
+    const applyingToast = toast.loading("Submitting leave application...");
+    try {
+      await api.post('/api/leaves', {
+          startDate,
+          endDate,
+          reason,
+          substituteId: selectedSubstitute
+      });
+      toast.success("Leave application submitted successfully!", { id: applyingToast });
+      setOpen(false);
+      fetchLeaves();
+      // Reset
+      setStartDate('');
+      setEndDate('');
+      setReason('');
+      setSelectedSubstitute('');
+    } catch (err) {
+      toast.error("Failed to submit application", { id: applyingToast });
+    }
   };
 
   return (
@@ -49,13 +98,13 @@ export default function FacultyLeavePage() {
           <Card className="border-none shadow-xl shadow-slate-200/40">
             <CardContent className="p-6">
               <p className="text-slate-500 font-semibold mb-2">Approved Leaves</p>
-              <h2 className="text-4xl font-black text-slate-800">4</h2>
+              <h2 className="text-4xl font-black text-slate-800">{leaves.filter(l => l.status === 'APPROVED').length}</h2>
             </CardContent>
           </Card>
           <Card className="border-none shadow-xl shadow-slate-200/40">
             <CardContent className="p-6">
               <p className="text-slate-500 font-semibold mb-2">Pending Approval</p>
-              <h2 className="text-4xl font-black text-amber-500">1</h2>
+              <h2 className="text-4xl font-black text-amber-500">{leaves.filter(l => l.status === 'PENDING').length}</h2>
             </CardContent>
           </Card>
         </div>
@@ -75,8 +124,8 @@ export default function FacultyLeavePage() {
                     <div>
                       <h4 className="font-bold text-slate-900 text-lg">{leave.reason}</h4>
                       <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-slate-500 font-medium">
-                        <span className="flex items-center gap-1"><CalendarIcon className="h-3.5 w-3.5" /> {leave.startDate} to {leave.endDate}</span>
-                        {leave.substitute && <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 text-xs">Sub: {leave.substitute}</span>}
+                        <span className="flex items-center gap-1"><CalendarIcon className="h-3.5 w-3.5" /> {new Date(leave.startDate).toLocaleDateString()} to {new Date(leave.endDate).toLocaleDateString()}</span>
+                        {leave.substitute && <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 text-xs">Sub: {leave.substitute.user?.firstName}</span>}
                       </div>
                     </div>
                   </div>
@@ -115,24 +164,23 @@ export default function FacultyLeavePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <Input type="date" required className="h-11" />
+                  <Input type="date" required className="h-11" value={startDate} onChange={e => setStartDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>End Date</Label>
-                  <Input type="date" required className="h-11" />
+                  <Input type="date" required className="h-11" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Reason for Leave</Label>
-                <Textarea required placeholder="Please provide a brief reason..." className="h-24 resize-none" />
+                <Textarea required placeholder="Please provide a brief reason..." className="h-24 resize-none" value={reason} onChange={e => setReason(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Substitute Faculty (Optional)</Label>
-                <Select>
+                <Select value={selectedSubstitute} onValueChange={setSelectedSubstitute}>
                   <SelectTrigger className="h-11"><SelectValue placeholder="Select Colleague" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="f1">Dr. Jane Smith</SelectItem>
-                    <SelectItem value="f2">Prof. Alan Turing</SelectItem>
+                    {colleagues.map(c => <SelectItem key={c.id} value={c.id}>{c.user?.firstName} {c.user?.lastName}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-slate-500">Your selected substitute will receive an automated request to cover your lectures.</p>

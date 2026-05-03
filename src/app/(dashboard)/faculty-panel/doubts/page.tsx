@@ -11,45 +11,64 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
+import api from '@/lib/axios';
+import { useAuthStore } from '@/store/useAuthStore';
+
 export default function FacultyDoubtsPage() {
+  const { user: currentUser } = useAuthStore();
   const [selectedDoubt, setSelectedDoubt] = useState<any>(null);
   const [reply, setReply] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [doubtsList, setDoubtsList] = useState<any[]>([]);
 
-  const doubtsList = [
-    { 
-      id: '1', 
-      student: 'Alex Johnson', 
-      enrollment: 'CS23001', 
-      subject: 'Data Structures', 
-      status: 'OPEN', 
-      question: 'Sir, I am having trouble understanding the time complexity of AVL tree rotations. Could you explain why it is O(1)?',
-      time: '2 hours ago',
-      replies: []
-    },
-    { 
-      id: '2', 
-      student: 'Sarah Williams', 
-      enrollment: 'CS23002', 
-      subject: 'Algorithms', 
-      status: 'RESOLVED', 
-      question: 'Is dynamic programming always better than divide and conquer?',
-      time: '1 day ago',
-      replies: [
-        { sender: 'Faculty', message: 'Not always. It depends on whether the problem has overlapping subproblems.', time: '23 hours ago' }
-      ]
+  const fetchDoubts = async () => {
+    try {
+      const res = await api.get('/api/doubts');
+      setDoubtsList(res.data.data);
+    } catch (err) {
+      toast.error("Failed to fetch doubts");
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  const handleSendReply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reply.trim()) return;
-    toast.success("Reply sent to student.");
-    setReply('');
   };
 
-  const markResolved = () => {
-    toast.success("Query marked as resolved.");
-    setSelectedDoubt(null);
+  React.useEffect(() => {
+    fetchDoubts();
+  }, []);
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reply.trim() || !selectedDoubt) return;
+    
+    try {
+      await api.post(`/api/doubts/${selectedDoubt.id}/reply`, { message: reply });
+      toast.success("Reply sent to student.");
+      setReply('');
+      fetchDoubts();
+      // Refresh selected doubt to show new reply
+      const updatedDoubt = { ...selectedDoubt };
+      updatedDoubt.replies.push({
+          message: reply,
+          user: { firstName: currentUser?.firstName, lastName: currentUser?.lastName },
+          createdAt: new Date().toISOString(),
+          userId: currentUser?.id
+      });
+      setSelectedDoubt(updatedDoubt);
+    } catch (err) {
+      toast.error("Failed to send reply");
+    }
+  };
+
+  const markResolved = async () => {
+    if (!selectedDoubt) return;
+    try {
+        await api.patch(`/api/doubts/${selectedDoubt.id}`, { status: 'RESOLVED' });
+        toast.success("Query marked as resolved.");
+        fetchDoubts();
+        setSelectedDoubt(prev => ({ ...prev, status: 'RESOLVED' }));
+    } catch (err) {
+        toast.error("Failed to update status");
+    }
   };
 
   return (
@@ -77,11 +96,11 @@ export default function FacultyDoubtsPage() {
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-slate-200 text-slate-600 text-xs font-bold">{doubt.student.substring(0,2).toUpperCase()}</AvatarFallback>
+                          <AvatarFallback className="bg-slate-200 text-slate-600 text-xs font-bold">{doubt.student?.user?.firstName?.substring(0,1)}{doubt.student?.user?.lastName?.substring(0,1)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-bold text-slate-900 leading-none">{doubt.student}</p>
-                          <p className="text-[10px] text-slate-500">{doubt.subject}</p>
+                          <p className="text-sm font-bold text-slate-900 leading-none">{doubt.student?.user?.firstName} {doubt.student?.user?.lastName}</p>
+                          <p className="text-[10px] text-slate-500">{doubt.subject?.name}</p>
                         </div>
                       </div>
                       <Badge variant="outline" className={doubt.status === 'OPEN' ? 'border-rose-200 text-rose-600 bg-rose-50' : 'border-emerald-200 text-emerald-600 bg-emerald-50'}>
@@ -89,7 +108,7 @@ export default function FacultyDoubtsPage() {
                       </Badge>
                     </div>
                     <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">{doubt.question}</p>
-                    <p className="text-[10px] text-slate-400 mt-2 font-medium">{doubt.time}</p>
+                    <p className="text-[10px] text-slate-400 mt-2 font-medium">{new Date(doubt.createdAt).toLocaleTimeString()}</p>
                   </div>
                 ))}
               </div>
@@ -102,8 +121,8 @@ export default function FacultyDoubtsPage() {
               <>
                 <div className="p-6 bg-white border-b border-slate-100 flex justify-between items-center">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">{selectedDoubt.subject} Query</h2>
-                    <p className="text-sm text-slate-500">Raised by {selectedDoubt.student} ({selectedDoubt.enrollment})</p>
+                    <h2 className="text-xl font-bold text-slate-900">{selectedDoubt.subject?.name} Query</h2>
+                    <p className="text-sm text-slate-500">Raised by {selectedDoubt.student?.user?.firstName} {selectedDoubt.student?.user?.lastName}</p>
                   </div>
                   {selectedDoubt.status === 'OPEN' && (
                     <Button onClick={markResolved} variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 font-bold">
@@ -117,29 +136,29 @@ export default function FacultyDoubtsPage() {
                     {/* Original Question */}
                     <div className="flex gap-4">
                       <Avatar className="h-10 w-10 shrink-0 shadow-sm">
-                        <AvatarFallback className="bg-slate-200 text-slate-700 font-bold">{selectedDoubt.student.substring(0,2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="bg-slate-200 text-slate-700 font-bold">{selectedDoubt.student?.user?.firstName?.substring(0,1)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none shadow-sm text-slate-800">
                           <p className="leading-relaxed">{selectedDoubt.question}</p>
                         </div>
-                        <span className="text-[10px] text-slate-400 mt-1 ml-1 block font-medium flex items-center gap-1"><Clock className="h-3 w-3" /> {selectedDoubt.time}</span>
+                        <span className="text-[10px] text-slate-400 mt-1 ml-1 block font-medium flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(selectedDoubt.createdAt).toLocaleString()}</span>
                       </div>
                     </div>
 
                     {/* Replies */}
                     {selectedDoubt.replies.map((reply: any, i: number) => (
-                      <div key={i} className={`flex gap-4 ${reply.sender === 'Faculty' ? 'flex-row-reverse' : ''}`}>
+                      <div key={i} className={`flex gap-4 ${reply.userId === currentUser?.id ? 'flex-row-reverse' : ''}`}>
                         <Avatar className="h-10 w-10 shrink-0 shadow-sm">
-                          <AvatarFallback className={reply.sender === 'Faculty' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-200 text-slate-700 font-bold'}>
-                            {reply.sender === 'Faculty' ? 'ME' : selectedDoubt.student.substring(0,2).toUpperCase()}
+                          <AvatarFallback className={reply.userId === currentUser?.id ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-200 text-slate-700 font-bold'}>
+                            {reply.userId === currentUser?.id ? 'ME' : reply.user?.firstName?.substring(0,1)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className={`p-4 rounded-2xl shadow-sm text-slate-800 ${reply.sender === 'Faculty' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 rounded-tl-none'}`}>
+                          <div className={`p-4 rounded-2xl shadow-sm text-slate-800 ${reply.userId === currentUser?.id ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 rounded-tl-none'}`}>
                             <p className="leading-relaxed">{reply.message}</p>
                           </div>
-                          <span className={`text-[10px] text-slate-400 mt-1 block font-medium flex items-center gap-1 ${reply.sender === 'Faculty' ? 'justify-end mr-1' : 'ml-1'}`}><Clock className="h-3 w-3" /> {reply.time}</span>
+                          <span className={`text-[10px] text-slate-400 mt-1 block font-medium flex items-center gap-1 ${reply.userId === currentUser?.id ? 'justify-end mr-1' : 'ml-1'}`}><Clock className="h-3 w-3" /> {new Date(reply.createdAt).toLocaleTimeString()}</span>
                         </div>
                       </div>
                     ))}
