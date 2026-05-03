@@ -35,6 +35,8 @@ exports.onboardFaculty = asyncHandler(async (req, res) => {
       password: hashedPassword,
       firstName,
       lastName,
+      name: name.trim(),
+      role: 'FACULTY',
       collegeId,
       isActive: true,
       facultyProfile: {
@@ -162,6 +164,7 @@ exports.updateFaculty = asyncHandler(async (req, res) => {
     data: {
       firstName,
       lastName,
+      name: name ? name.trim() : undefined,
       email,
       facultyProfile: {
         update: {

@@ -91,6 +91,8 @@ exports.enrollStudent = asyncHandler(async (req, res) => {
       password: hashedPassword,
       firstName,
       lastName,
+      name: name.trim(),
+      role: 'STUDENT',
       collegeId,
       isActive: true,
       studentProfile: {
@@ -261,6 +263,8 @@ exports.bulkEnrollStudents = asyncHandler(async (req, res) => {
             password: hashedPassword,
             firstName,
             lastName,
+            name: name.trim(),
+            role: 'STUDENT',
             collegeId,
             studentProfile: {
               create: {
@@ -329,6 +333,7 @@ exports.updateStudent = asyncHandler(async (req, res) => {
     const parts = name.trim().split(' ');
     dataToUpdate.firstName = parts[0];
     dataToUpdate.lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
+    dataToUpdate.name = name.trim();
   }
   if (email) dataToUpdate.email = email;
   if (phone !== undefined) dataToUpdate.phone = phone;

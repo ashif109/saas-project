@@ -18,6 +18,8 @@ model User {
   password       String
   firstName      String
   lastName       String
+  name           String?   // Added to match Mongoose schema
+  role           String?   @default("STUDENT") // Added to match Mongoose schema
   phone          String?
   isActive       Boolean   @default(true)
   
