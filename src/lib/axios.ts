@@ -2,19 +2,18 @@ import axios from 'axios';
 
 // Ensure NEXT_PUBLIC_API_URL is used if available, otherwise fallback to local/production defaults
 const getBaseURL = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
+  // If explicitly set to a valid external URL, use it
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith('http')) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  if (typeof window === 'undefined') {
-    // Server-side rendering (needs absolute URL)
-    return process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:5000'
-      : 'https://saas-project-1-59yi.onrender.com';
+  // For local development
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:5000';
   }
   
-  // Client-side: rely on Next.js rewrites (from next.config.ts)
-  return '';
+  // Hardcoded production backend
+  return 'https://saas-project-1-59yi.onrender.com';
 };
 
 const api = axios.create({
