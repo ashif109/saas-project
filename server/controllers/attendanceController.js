@@ -36,7 +36,7 @@ exports.getFacultySetup = async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
+      where: { id: req.user._id ? req.user._id.toString() : req.user.id },
       include: { facultyProfile: true }
     });
 

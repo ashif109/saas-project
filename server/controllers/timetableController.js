@@ -44,21 +44,27 @@ exports.getTimetable = async (req, res) => {
       const firstCollege = await prisma.college.findFirst();
       collegeId = firstCollege?.id;
     }
+    
+    // Ensure collegeId is a string for Prisma
+    const collegeIdStr = collegeId.toString();
 
     const where = {};
     if (batchId) {
       where.batchId = batchId;
     } else {
-      where.batch = { collegeId };
+      where.batch = { collegeId: collegeIdStr };
     }
 
     if (req.user?.role === 'FACULTY') {
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user._id ? req.user._id.toString() : req.user.id },
         include: { facultyProfile: true }
       });
       if (user?.facultyProfile) {
         where.facultyId = user.facultyProfile.id;
+        // When filtering by faculty, we can relax the batch filter 
+        // to ensure they see all their assigned classes across any batch
+        delete where.batch;
       }
     }
 
