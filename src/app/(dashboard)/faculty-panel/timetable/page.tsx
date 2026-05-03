@@ -1,37 +1,56 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar as CalendarIcon, MapPin, Users, BookOpen } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Users, BookOpen, Loader2 } from 'lucide-react';
 import { format, addDays, startOfWeek } from 'date-fns';
+import api from '@/lib/axios';
 
 export default function FacultyTimetablePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [loading, setLoading] = useState(true);
+  const [timetableData, setTimetableData] = useState<Record<string, any[]>>({
+    'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': [], 'Saturday': []
+  });
 
   const weekDays = Array.from({ length: 6 }).map((_, i) => addDays(startOfWeek(currentDate, { weekStartsOn: 1 }), i));
 
-  const timetableData = {
-    'Monday': [
-      { time: '09:00 - 10:30', type: 'Lecture', subject: 'Data Structures', room: 'Room 302', batch: 'CS 2nd Year' },
-      { time: '11:00 - 13:00', type: 'Lab', subject: 'Algorithms Lab', room: 'Lab 4', batch: 'CS 2nd Year' }
-    ],
-    'Tuesday': [
-      { time: '10:00 - 11:30', type: 'Lecture', subject: 'Advanced Algorithms', room: 'Room 205', batch: 'IT 3rd Year' }
-    ],
-    'Wednesday': [
-      { time: '09:00 - 10:30', type: 'Lecture', subject: 'Data Structures', room: 'Room 302', batch: 'CS 2nd Year' },
-      { time: '14:00 - 15:30', type: 'Doubt Session', subject: 'Open Hours', room: 'Cabin 12', batch: 'All' }
-    ],
-    'Thursday': [
-      { time: '11:00 - 13:00', type: 'Lab', subject: 'Algorithms Lab', room: 'Lab 4', batch: 'CS 2nd Year' }
-    ],
-    'Friday': [
-      { time: '10:00 - 11:30', type: 'Lecture', subject: 'Advanced Algorithms', room: 'Room 205', batch: 'IT 3rd Year' },
-      { time: '14:00 - 15:00', type: 'Lecture', subject: 'Data Structures', room: 'Room 302', batch: 'CS 2nd Year' }
-    ],
-    'Saturday': []
-  };
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      try {
+        const res = await api.get('/api/timetable');
+        
+        const grouped: Record<string, any[]> = {
+          'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': [], 'Saturday': []
+        };
+
+        res.data.forEach((entry: any) => {
+          if (grouped[entry.dayOfWeek]) {
+            grouped[entry.dayOfWeek].push({
+              time: `${entry.startTime} - ${entry.endTime}`,
+              type: entry.subject?.name?.toLowerCase().includes('lab') ? 'Lab' : 'Lecture',
+              subject: entry.subject?.name || 'Unknown',
+              room: entry.roomInfo || 'TBD',
+              batch: `${entry.batch?.course?.name || ''} ${entry.batch?.name || ''}`.trim() || 'Unknown Batch'
+            });
+          }
+        });
+
+        Object.keys(grouped).forEach(day => {
+          grouped[day].sort((a, b) => a.time.localeCompare(b.time));
+        });
+
+        setTimetableData(grouped);
+      } catch (error) {
+        console.error("Failed to fetch timetable", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTimetable();
+  }, []);
 
   const todayStr = format(currentDate, 'EEEE');
 
@@ -42,6 +61,13 @@ export default function FacultyTimetablePage() {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">My Timetable</h1>
           <p className="text-slate-500">Your personalized academic schedule for the week.</p>
         </div>
+
+        {loading ? (
+          <div className="h-[40vh] flex flex-col items-center justify-center space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
+            <p className="text-slate-500 font-bold animate-pulse">Loading schedule...</p>
+          </div>
+        ) : (
 
         <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
           {weekDays.map((day, idx) => {
@@ -97,6 +123,7 @@ export default function FacultyTimetablePage() {
             );
           })}
         </div>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -45,7 +45,22 @@ exports.getTimetable = async (req, res) => {
       collegeId = firstCollege?.id;
     }
 
-    const where = batchId ? { batchId } : { batch: { collegeId } };
+    const where = {};
+    if (batchId) {
+      where.batchId = batchId;
+    } else {
+      where.batch = { collegeId };
+    }
+
+    if (req.user?.role === 'FACULTY') {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        include: { facultyProfile: true }
+      });
+      if (user?.facultyProfile) {
+        where.facultyId = user.facultyProfile.id;
+      }
+    }
 
     const entries = await prisma.timetableEntry.findMany({
       where,
