@@ -6,13 +6,15 @@ const getBaseURL = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Detect if we are running in a browser on localhost
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:5000';
+  if (typeof window === 'undefined') {
+    // Server-side rendering (needs absolute URL)
+    return process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:5000'
+      : 'https://saas-project-1-59yi.onrender.com';
   }
   
-  // Production fallback
-  return 'https://saas-project-1-59yi.onrender.com';
+  // Client-side: rely on Next.js rewrites (from next.config.ts)
+  return '';
 };
 
 const api = axios.create({
