@@ -35,7 +35,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      const isLoginRequest = error.config.url?.includes('/api/auth/login');
+      const isLoginPage = typeof window !== 'undefined' && (
+        window.location.pathname === '/login' || 
+        window.location.pathname === '/login/' ||
+        window.location.pathname.includes('/login')
+      );
+
+      if (typeof window !== 'undefined' && !isLoginRequest && !isLoginPage) {
         localStorage.removeItem('pulse_token');
         localStorage.removeItem('pulse-auth-storage');
         window.location.href = '/login';
