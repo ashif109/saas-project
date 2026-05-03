@@ -2,17 +2,12 @@ import axios from 'axios';
 
 // Ensure NEXT_PUBLIC_API_URL is used if available, otherwise fallback to local/production defaults
 const getBaseURL = () => {
-  // If explicitly set to a valid external URL, use it
-  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith('http')) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // For local development
+  // Always use local backend for local development
   if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:5000';
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
   }
   
-  // Hardcoded production backend
+  // FORCEfully hardcode Render backend for production to bypass ALL Vercel routing/env issues
   return 'https://saas-project-1-59yi.onrender.com';
 };
 
