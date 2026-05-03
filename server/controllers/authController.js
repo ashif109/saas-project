@@ -22,7 +22,7 @@ const login = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    console.log('User not found in DB via Prisma');
+    console.log(`AUTH ERROR: User not found for email [${email}]`);
     await createLog({
       action: 'Login Failure',
       module: 'Auth',
@@ -37,7 +37,7 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
-  console.log('Password match:', isMatch);
+  console.log(`AUTH DEBUG: Password match for [${email}]:`, isMatch);
 
   if (isMatch) {
     // Fetch Settings for token expiry
