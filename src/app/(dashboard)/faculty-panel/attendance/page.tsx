@@ -24,38 +24,34 @@ export default function FacultyAttendancePage() {
   const [selectedBatch, setSelectedBatch] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   
-  // Mock data for dropdowns (in production, fetch from /api/faculty-panel/assignments)
-  const batches = [
-    { id: 'b1', name: 'CS 2nd Year (2023-2027)' },
-    { id: 'b2', name: 'IT 3rd Year (2022-2026)' }
-  ];
-  const subjects = [
-    { id: 's1', name: 'Data Structures' },
-    { id: 's2', name: 'Algorithms' }
-  ];
+  const [batches, setBatches] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchSetup = async () => {
+      try {
+        const res = await api.get('/api/attendance/faculty-setup');
+        setBatches(res.data.batches || []);
+        setSubjects(res.data.subjects || []);
+      } catch (err) {
+        toast.error("Failed to fetch batches and subjects");
+      }
+    };
+    fetchSetup();
+  }, []);
 
   const fetchStudents = async () => {
     if (!selectedBatch) return toast.error("Please select a batch first");
     setLoading(true);
     try {
-      // Mocked response for UI building. In production, call /api/students?batchId=...
-      setTimeout(() => {
-        const mockStudents = [
-          { id: '1', name: 'Alex Johnson', enrollmentNo: 'CS23001' },
-          { id: '2', name: 'Sarah Williams', enrollmentNo: 'CS23002' },
-          { id: '3', name: 'Michael Brown', enrollmentNo: 'CS23003' },
-          { id: '4', name: 'Emily Davis', enrollmentNo: 'CS23004' },
-          { id: '5', name: 'James Wilson', enrollmentNo: 'CS23005' },
-        ];
-        setStudents(mockStudents);
-        // Initialize all as PRESENT
-        const initialData: Record<string, string> = {};
-        mockStudents.forEach(s => initialData[s.id] = 'PRESENT');
-        setAttendanceData(initialData);
-        setLoading(false);
-      }, 600);
+      const res = await api.get(`/api/attendance/students?batchId=${selectedBatch}`);
+      setStudents(res.data);
+      const initialData: Record<string, string> = {};
+      res.data.forEach((s: any) => initialData[s.id] = 'PRESENT');
+      setAttendanceData(initialData);
     } catch (error) {
       toast.error("Failed to load students");
+    } finally {
       setLoading(false);
     }
   };
@@ -72,13 +68,17 @@ export default function FacultyAttendancePage() {
 
   const handleSave = async () => {
     if (!selectedSubject) return toast.error("Please select a subject");
+    if (!selectedBatch) return toast.error("Please select a batch");
     
     const savingToast = toast.loading("Saving attendance...");
     try {
-      // Production: api.post('/api/attendance/bulk', { date, subjectId: selectedSubject, batchId: selectedBatch, attendance: attendanceData })
-      setTimeout(() => {
-        toast.success("Attendance saved successfully!", { id: savingToast });
-      }, 800);
+      await api.post('/api/attendance/bulk', { 
+        date, 
+        subjectId: selectedSubject, 
+        batchId: selectedBatch, 
+        attendance: attendanceData 
+      });
+      toast.success("Attendance saved successfully!", { id: savingToast });
     } catch (error) {
       toast.error("Failed to save attendance", { id: savingToast });
     }
