@@ -24,7 +24,8 @@ export default function FacultyDoubtsPage() {
   const fetchDoubts = async () => {
     try {
       const res = await api.get('/api/doubts');
-      setDoubtsList(res.data.data);
+      // getDoubts returns { success: true, data: [] }
+      setDoubtsList(res.data.data || []);
     } catch (err) {
       toast.error("Failed to fetch doubts");
     } finally {

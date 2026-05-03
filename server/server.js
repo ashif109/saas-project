@@ -56,7 +56,7 @@ app.get('/api', (req, res) => {
     res.json({ message: 'Pulse API V1 is online and ready.', status: 'Healthy' });
 });
 
-// --- API Routes ---
+// --- API Routes (Added a small comment to trigger Vercel redeploy) ---
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/colleges', require('./routes/collegeRoutes'));

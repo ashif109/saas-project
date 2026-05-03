@@ -17,7 +17,7 @@ const getPerformanceAnalytics = asyncHandler(async (req, res) => {
         where: { batchId },
         include: {
             user: { select: { firstName: true, lastName: true } },
-            attendance: { where: { subjectId } },
+            attendances: { where: { subjectId } },
             internalMarks: { where: { subjectId } }
         }
     });
@@ -31,8 +31,8 @@ const getPerformanceAnalytics = asyncHandler(async (req, res) => {
 
     const studentRoster = students.map(student => {
         // Attendance calculation
-        const totalClasses = student.attendance.length;
-        const presentClasses = student.attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
+        const totalClasses = student.attendances.length;
+        const presentClasses = student.attendances.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
         const attendancePercent = totalClasses > 0 ? (presentClasses / totalClasses) * 100 : 0;
         
         // Marks calculation

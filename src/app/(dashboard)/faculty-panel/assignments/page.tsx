@@ -31,7 +31,8 @@ export default function AssignmentsPage() {
   const fetchAssignments = async () => {
     try {
       const res = await api.get('/api/assignments');
-      setAssignments(res.data.data);
+      // getAssignments returns { success: true, data: [] }
+      setAssignments(res.data.data || []);
     } catch (err) {
       toast.error("Failed to fetch assignments");
     } finally {

@@ -29,7 +29,8 @@ export default function FacultyLeavePage() {
   const fetchLeaves = async () => {
     try {
       const res = await api.get('/api/leaves/my-leaves');
-      setLeaves(res.data.data);
+      // getMyLeaves returns { success: true, data: [] }
+      setLeaves(res.data.data || []);
     } catch (err) {
       toast.error("Failed to fetch leave history");
     } finally {
@@ -43,7 +44,8 @@ export default function FacultyLeavePage() {
     const fetchColleagues = async () => {
         try {
             const res = await api.get('/api/faculty');
-            setColleagues(res.data || []);
+            // getFaculties returns { data: [], pagination: {} }
+            setColleagues(res.data.data || []);
         } catch (err) {
             console.error("Failed to fetch colleagues");
         }
