@@ -1,6 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const prisma = require('../config/prisma');
-const bcrypt = require('bcryptjs');
+const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const SystemSettings = require('../models/SystemSettings');
 const { sendPasswordResetOtp } = require('../services/emailService');
@@ -15,10 +14,7 @@ const login = asyncHandler(async (req, res) => {
   const { password } = req.body;
   console.log('Login attempt for:', email);
 
-  const user = await prisma.user.findFirst({ 
-    where: { email },
-    include: { college: true }
-  });
+  const user = await User.findOne({ email }).populate('college');
 
   if (!user) {
     console.log('User not found in DB');
@@ -35,7 +31,7 @@ const login = asyncHandler(async (req, res) => {
     throw new Error('Invalid email or password');
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
+  const isMatch = await user.matchPassword(password);
   console.log('Password match:', isMatch);
 
   if (isMatch) {
@@ -45,7 +41,7 @@ const login = asyncHandler(async (req, res) => {
     const timeoutMinutes = parseInt(settings.sessionTimeout) || 60;
 
     await createLog({
-      user: user.id,
+      user: user._id,
       userName: user.name || `${user.firstName} ${user.lastName}`,
       userEmail: user.email,
       action: 'Login Success',
@@ -56,19 +52,19 @@ const login = asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent']
     });
     res.json({
-      _id: user.id,
+      _id: user._id,
       name: user.name || `${user.firstName} ${user.lastName}`,
       email: user.email,
       role: user.role,
       avatar: user.avatar,
       phone: user.phone,
       college: user.college,
-      token: generateToken(user.id, timeoutMinutes),
+      token: generateToken(user._id, timeoutMinutes),
     });
   } else {
     await createLog({
       user: user._id,
-      userName: user.name,
+      userName: user.name || `${user.firstName} ${user.lastName}`,
       userEmail: user.email,
       action: 'Login Failure',
       module: 'Auth',
@@ -86,14 +82,11 @@ const login = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 const getProfile = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    include: { college: true }
-  });
+  const user = await User.findById(req.user._id).populate('college');
 
   if (user) {
     res.json({
-      _id: user.id,
+      _id: user._id,
       name: user.name || `${user.firstName} ${user.lastName}`,
       email: user.email,
       role: user.role,
@@ -103,7 +96,7 @@ const getProfile = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(404);
-    throw new Error('User not found');
+    throw new Error('User found');
   }
 });
 
@@ -111,9 +104,7 @@ const getProfile = asyncHandler(async (req, res) => {
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id }
-  });
+  const user = await User.findById(req.user._id);
 
   if (user) {
     // If updating password, verify current password first
