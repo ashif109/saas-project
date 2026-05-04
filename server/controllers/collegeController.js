@@ -1,11 +1,20 @@
 const asyncHandler = require('express-async-handler');
-const College = require('../models/College');
-const User = require('../models/User');
-const SystemSettings = require('../models/SystemSettings');
+const prisma = require('../config/prisma');
+const bcrypt = require('bcryptjs');
 const { sendWelcomeEmail } = require('../services/emailService');
 const { createLog } = require('./logController');
+
 const validator = {
   email: (v) => /\S+@\S+\.\S+/.test(v),
+};
+
+// Helper to get system settings with fallback
+const getSettings = async () => {
+  let settings = await prisma.systemSettings.findFirst();
+  if (!settings) {
+    settings = await prisma.systemSettings.create({ data: {} });
+  }
+  return settings;
 };
 
 // @desc    Register a new college
@@ -30,11 +39,7 @@ const registerCollege = asyncHandler(async (req, res) => {
     features 
   } = req.body;
 
-  // Fetch Global System Settings
-  let settings = await SystemSettings.findOne();
-  if (!settings) {
-    settings = await SystemSettings.create({});
-  }
+  const settings = await getSettings();
 
   // Validate Admin Password Length
   const minLength = parseInt(settings.minPasswordLength) || 8;
@@ -44,97 +49,93 @@ const registerCollege = asyncHandler(async (req, res) => {
   }
 
   // Check Max Colleges Limit
-  const collegeCount = await College.countDocuments();
+  const collegeCount = await prisma.college.count();
   if (collegeCount >= parseInt(settings.maxColleges)) {
     res.status(403);
     throw new Error(`Platform limit reached: Maximum of ${settings.maxColleges} colleges allowed.`);
   }
 
   // Check if college already exists
-  let query = { code: code.toUpperCase() };
-  if (settings.duplicateNameRestriction) {
-    query = { 
-      $or: [
-        { name: { $regex: new RegExp(`^${name}$`, 'i') } }, 
-        { code: code.toUpperCase() }
-      ] 
-    };
-  }
-
-  const collegeExists = await College.findOne(query);
+  const collegeExists = await prisma.college.findFirst({
+    where: {
+      OR: [
+        { name: { equals: name.trim(), mode: 'insensitive' } },
+        { code: code.trim().toUpperCase() }
+      ]
+    }
+  });
 
   if (collegeExists) {
-    await createLog({
-      user: req.user._id,
-      userName: req.user.name,
-      userEmail: req.user.email,
-      action: 'College Registration Failure',
-      module: 'Colleges',
-      details: `Attempted to register duplicate college: ${name}`,
-      severity: 'Warning',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    res.status(409); // Conflict
+    res.status(409);
     throw new Error(`College with name "${name}" or code "${code}" already exists`);
   }
 
   // Check if admin email already exists
-  const userExists = await User.findOne({ email: adminEmail });
+  const userExists = await prisma.user.findUnique({ 
+    where: { email: adminEmail.trim().toLowerCase() } 
+  });
   if (userExists) {
-    res.status(409); // Conflict
+    res.status(409);
     throw new Error(`User with email "${adminEmail}" already exists`);
   }
 
-  // Determine initial status based on settings
-  // If autoApproval is true OR approvalRequirement is false, set to Active
-  // Otherwise, set to Pending
   let initialStatus = 'Active';
   if (settings.approvalRequirement && !settings.autoApproval) {
     initialStatus = 'Pending';
   }
 
-  const college = await College.create({
-    name,
-    code,
-    email,
-    phone,
-    website,
-    logoUrl,
-    address,
-    city,
-    state,
-    country,
-    status: req.body.status || initialStatus,
-    subscription: {
-      plan: subscription || settings.defaultPlan,
-      status: 'Active',
-      paymentStatus: 'Paid'
-    },
-    features: features || {
-       doubtSystem: settings.globalDoubtSystem,
-       attendance: settings.globalAttendance,
-       analytics: settings.globalAnalytics
-     },
-     limits: {
-       students: parseInt(settings.studentLimit) || 5000,
-       faculty: parseInt(settings.facultyLimit) || 250
-     }
-   });
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
+  const nameParts = adminName?.trim().split(' ') || ['College', 'Admin'];
+  const firstName = nameParts[0];
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+  const college = await prisma.college.create({
+    data: {
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      email: email.trim().toLowerCase(),
+      phone,
+      website,
+      logoUrl,
+      address,
+      city,
+      state,
+      country: country || 'India',
+      status: req.body.status || initialStatus,
+      subscription: {
+        plan: subscription || settings.defaultPlan,
+        status: 'Active',
+        paymentStatus: 'Paid',
+        startDate: new Date(),
+        history: []
+      },
+      features: features || {
+        doubtSystem: settings.globalDoubtSystem,
+        attendance: settings.globalAttendance,
+        analytics: settings.globalAnalytics
+      },
+      limits: {
+        students: parseInt(settings.studentLimit) || 5000,
+        faculty: parseInt(settings.facultyLimit) || 250
+      },
+      users: {
+        create: {
+          name: adminName || 'College Admin',
+          firstName,
+          lastName,
+          email: adminEmail.trim().toLowerCase(),
+          password: hashedPassword,
+          role: 'COLLEGE_ADMIN',
+          isActive: true,
+          mustChangePassword: settings.forcePasswordReset
+        }
+      }
+    }
+  });
 
   if (college) {
-    // Create College Admin User
-    const adminUser = await User.create({
-      name: adminName,
-      email: adminEmail,
-      password: adminPassword,
-      role: 'COLLEGE_ADMIN',
-      college: college._id,
-      mustChangePassword: settings.forcePasswordReset
-    });
-
     await createLog({
-      user: req.user._id,
+      user: req.user.id || req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
       action: 'College Registered',
@@ -145,7 +146,6 @@ const registerCollege = asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent']
     });
 
-    // Send Welcome Email if enabled - await is REQUIRED on Serverless (Vercel)
     if (settings.sendWelcomeEmail) {
       try {
         await sendWelcomeEmail(adminEmail, adminPassword, name, settings.sendCredentials);
@@ -165,7 +165,9 @@ const registerCollege = asyncHandler(async (req, res) => {
 // @route   GET /api/colleges
 // @access  Private/SuperAdmin
 const getColleges = asyncHandler(async (req, res) => {
-  const colleges = await College.find({});
+  const colleges = await prisma.college.findMany({
+    orderBy: { createdAt: 'desc' }
+  });
   res.json(colleges);
 });
 
@@ -173,9 +175,11 @@ const getColleges = asyncHandler(async (req, res) => {
 // @route   GET /api/colleges/:id/admin
 // @access  Private/SuperAdmin
 const getCollegeAdmin = asyncHandler(async (req, res) => {
-  const admin = await User.findOne({ 
-    college: req.params.id,
-    role: 'COLLEGE_ADMIN'
+  const admin = await prisma.user.findFirst({ 
+    where: { 
+      collegeId: req.params.id,
+      role: 'COLLEGE_ADMIN'
+    }
   });
 
   if (!admin) {
@@ -190,7 +194,9 @@ const getCollegeAdmin = asyncHandler(async (req, res) => {
 // @route   GET /api/colleges/:id
 // @access  Private
 const getCollegeById = asyncHandler(async (req, res) => {
-  const college = await College.findById(req.params.id);
+  const college = await prisma.college.findUnique({
+    where: { id: req.params.id }
+  });
 
   if (college) {
     res.json(college);
@@ -204,17 +210,25 @@ const getCollegeById = asyncHandler(async (req, res) => {
 // @route   PUT /api/colleges/:id/status
 // @access  Private/SuperAdmin
 const updateCollegeStatus = asyncHandler(async (req, res) => {
-  const college = await College.findById(req.params.id);
+  const college = await prisma.college.findUnique({ where: { id: req.params.id } });
 
   if (college) {
-    college.status = req.body.status || college.status;
-    if (req.body.status === 'Disabled') {
-      college.subscription.status = 'Disabled';
-    } else if (req.body.status === 'Active' && college.subscription.status === 'Disabled') {
-      college.subscription.status = 'Active';
+    const newStatus = req.body.status || college.status;
+    const subData = college.subscription || {};
+    
+    if (newStatus === 'Disabled') {
+      subData.status = 'Disabled';
+    } else if (newStatus === 'Active' && subData.status === 'Disabled') {
+      subData.status = 'Active';
     }
     
-    const updatedCollege = await college.save();
+    const updatedCollege = await prisma.college.update({
+      where: { id: req.params.id },
+      data: { 
+        status: newStatus,
+        subscription: subData
+      }
+    });
     res.json(updatedCollege);
   } else {
     res.status(404);
@@ -227,27 +241,32 @@ const updateCollegeStatus = asyncHandler(async (req, res) => {
 // @access  Private/SuperAdmin
 const extendSubscription = asyncHandler(async (req, res) => {
   const { days, months, message } = req.body;
-  const college = await College.findById(req.params.id);
+  const college = await prisma.college.findUnique({ where: { id: req.params.id } });
 
   if (college) {
-    const currentExpiry = college.subscription.expiryDate || new Date();
+    const subData = college.subscription || {};
+    const currentExpiry = subData.expiryDate ? new Date(subData.expiryDate) : new Date();
     const newExpiry = new Date(currentExpiry);
     
     if (days) newExpiry.setDate(newExpiry.getDate() + days);
     if (months) newExpiry.setMonth(newExpiry.getMonth() + months);
 
-    college.subscription.expiryDate = newExpiry;
-    college.subscription.history.push({
+    subData.expiryDate = newExpiry;
+    if (!subData.history) subData.history = [];
+    subData.history.push({
       action: 'extended',
+      date: new Date(),
       message: message || `Subscription extended by ${days || 0} days and ${months || 0} months`
     });
 
-    // Update status based on new expiry
     const daysLeft = Math.ceil((newExpiry - new Date()) / (1000 * 60 * 60 * 24));
-    if (daysLeft > 7) college.subscription.status = 'Active';
-    else if (daysLeft > 0) college.subscription.status = 'Expiring Soon';
+    if (daysLeft > 7) subData.status = 'Active';
+    else if (daysLeft > 0) subData.status = 'Expiring Soon';
 
-    const updatedCollege = await college.save();
+    const updatedCollege = await prisma.college.update({
+      where: { id: req.params.id },
+      data: { subscription: subData }
+    });
     res.json(updatedCollege);
   } else {
     res.status(404);
@@ -260,19 +279,25 @@ const extendSubscription = asyncHandler(async (req, res) => {
 // @access  Private/SuperAdmin
 const changePlan = asyncHandler(async (req, res) => {
   const { plan, message } = req.body;
-  const college = await College.findById(req.params.id);
+  const college = await prisma.college.findUnique({ where: { id: req.params.id } });
 
   if (college) {
-    const previousPlan = college.subscription.plan;
-    college.subscription.plan = plan;
-    college.subscription.history.push({
+    const subData = college.subscription || {};
+    const previousPlan = subData.plan;
+    subData.plan = plan;
+    if (!subData.history) subData.history = [];
+    subData.history.push({
       action: 'upgraded/downgraded',
+      date: new Date(),
       previousPlan,
       newPlan: plan,
       message: message || `Plan changed from ${previousPlan} to ${plan}`
     });
 
-    const updatedCollege = await college.save();
+    const updatedCollege = await prisma.college.update({
+      where: { id: req.params.id },
+      data: { subscription: subData }
+    });
     res.json(updatedCollege);
   } else {
     res.status(404);
@@ -285,71 +310,25 @@ const changePlan = asyncHandler(async (req, res) => {
 // @access  Private/SuperAdmin
 const cancelSubscription = asyncHandler(async (req, res) => {
   const { message, disableAccess } = req.body;
-  const college = await College.findById(req.params.id);
+  const college = await prisma.college.findUnique({ where: { id: req.params.id } });
 
   if (college) {
-    college.subscription.status = 'Cancelled';
-    if (disableAccess) {
-      college.status = 'Disabled';
-    }
-    
-    college.subscription.history.push({
+    const subData = college.subscription || {};
+    subData.status = 'Cancelled';
+    if (!subData.history) subData.history = [];
+    subData.history.push({
       action: 'cancelled',
+      date: new Date(),
       message: message || 'Subscription cancelled by administrator'
     });
 
-    const updatedCollege = await college.save();
-    res.json(updatedCollege);
-  } else {
-    res.status(404);
-    throw new Error('College not found');
-  }
-});
-
-// @desc    Reactivate college subscription
-// @route   POST /api/colleges/:id/reactivate
-// @access  Private/SuperAdmin
-const reactivateSubscription = asyncHandler(async (req, res) => {
-  const { message } = req.body;
-  const college = await College.findById(req.params.id);
-
-  if (college) {
-    college.subscription.status = 'Active';
-    college.status = 'Active';
-    
-    college.subscription.history.push({
-      action: 'reactivated',
-      message: message || 'Subscription reactivated by administrator'
+    const updatedCollege = await prisma.college.update({
+      where: { id: req.params.id },
+      data: { 
+        status: disableAccess ? 'Disabled' : college.status,
+        subscription: subData 
+      }
     });
-
-    const updatedCollege = await college.save();
-    res.json(updatedCollege);
-  } else {
-    res.status(404);
-    throw new Error('College not found');
-  }
-});
-
-// @desc    Update payment status
-// @route   POST /api/colleges/:id/payment
-// @access  Private/SuperAdmin
-const updatePaymentStatus = asyncHandler(async (req, res) => {
-  const { status, message } = req.body;
-  const college = await College.findById(req.params.id);
-
-  if (college) {
-    college.subscription.paymentStatus = status;
-    if (status === 'Paid') {
-      college.subscription.lastPaymentDate = new Date();
-    }
-    
-    college.subscription.history.push({
-      action: 'payment',
-      paymentStatus: status,
-      message: message || `Payment status updated to ${status}`
-    });
-
-    const updatedCollege = await college.save();
     res.json(updatedCollege);
   } else {
     res.status(404);
@@ -361,35 +340,18 @@ const updatePaymentStatus = asyncHandler(async (req, res) => {
 // @route   DELETE /api/colleges/:id
 // @access  Private/SuperAdmin
 const deleteCollege = asyncHandler(async (req, res) => {
-  const college = await College.findById(req.params.id);
-
-  if (college) {
-    // Delete all users associated with this college
-    await User.deleteMany({ college: college._id });
-    
-    // Use deleteOne() instead of remove() which is deprecated
-    await College.deleteOne({ _id: college._id });
-    
-    res.json({ message: 'College and associated users removed' });
-  } else {
-    res.status(404);
-    throw new Error('College not found');
-  }
+  // Prisma delete will cascade if set up, or we can do it manually
+  // In our schema, we have onDelete: Cascade for most relations, but Restrict for CollegeUsers
+  // So we need to delete users first if we don't want to change the schema
+  
+  await prisma.user.deleteMany({ where: { collegeId: req.params.id } });
+  await prisma.college.delete({ where: { id: req.params.id } });
+  
+  res.json({ message: 'College and associated users removed' });
 });
 
-module.exports = {
-  registerCollege,
-  getColleges,
-  getCollegeById,
-  getCollegeAdmin,
-  updateCollegeStatus,
-  deleteCollege,
-  extendSubscription,
-  changePlan,
-  cancelSubscription,
-  reactivateSubscription,
-  updatePaymentStatus,
-  createCollegeWithAdmin: asyncHandler(async (req, res) => {
+// Unified create method (matches what Super Admin likely uses)
+const createCollegeWithAdmin = asyncHandler(async (req, res) => {
     const {
       name,
       code,
@@ -408,111 +370,136 @@ module.exports = {
       features,
     } = req.body;
 
-    console.log('Incoming createCollegeWithAdmin request:', { name, code, adminEmail });
-
     if (!name || !code || !email || !adminEmail || !adminPassword) {
       res.status(400);
       throw new Error('Missing required fields');
     }
-    if (!validator.email(email) || !validator.email(adminEmail)) {
-      res.status(400);
-      throw new Error('Invalid email format');
-    }
 
-    // Check for duplicate college by name (case-insensitive) or code
-    const existing = await College.findOne({ 
-      $or: [
-        { name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } }, 
-        { code: code.trim().toUpperCase() }
-      ] 
+    // Check for collision
+    const existing = await prisma.college.findFirst({
+      where: {
+        OR: [
+          { name: { equals: name.trim(), mode: 'insensitive' } },
+          { code: code.trim().toUpperCase() }
+        ]
+      }
     });
     
     if (existing) {
-      console.log('College collision detected:', { 
-        existingName: existing.name, 
-        existingCode: existing.code,
-        inputName: name,
-        inputCode: code
-      });
       res.status(409);
-      const conflictField = existing.code === code.trim().toUpperCase() ? 'code' : 'name';
-      throw new Error(`College already exists with this ${conflictField}: ${conflictField === 'code' ? existing.code : existing.name}`);
+      throw new Error(`College already exists with this name or code`);
     }
 
-    // Check for duplicate user by email
-    const existingUser = await User.findOne({ email: adminEmail.trim().toLowerCase() });
+    const existingUser = await prisma.user.findUnique({ 
+      where: { email: adminEmail.trim().toLowerCase() } 
+    });
     if (existingUser) {
-      console.log('User collision detected:', adminEmail);
       res.status(409);
       throw new Error(`User with email ${adminEmail.trim()} already exists`);
     }
 
-    const college = await College.create({
-      name: name.trim(),
-      code: code.trim().toUpperCase(),
-      email: email.trim().toLowerCase(),
-      phone: phone?.trim(),
-      website: website?.trim(),
-      logoUrl,
-      address: address?.trim(),
-      city: city?.trim(),
-      state: state?.trim(),
-      country: country || 'India',
-      status: req.body.status || 'Active',
-      subscription: {
-        plan: subscription,
-        status: 'Active',
-        paymentStatus: 'Paid'
-      },
-      features,
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const nameParts = adminName?.trim().split(' ') || ['College', 'Admin'];
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+    const college = await prisma.college.create({
+      data: {
+        name: name.trim(),
+        code: code.trim().toUpperCase(),
+        email: email.trim().toLowerCase(),
+        phone: phone?.trim(),
+        website: website?.trim(),
+        logoUrl,
+        address: address?.trim(),
+        city: city?.trim(),
+        state: state?.trim(),
+        country: country || 'India',
+        status: req.body.status || 'Active',
+        subscription: {
+          plan: subscription,
+          status: 'Active',
+          paymentStatus: 'Paid',
+          startDate: new Date()
+        },
+        features,
+        users: {
+          create: {
+            name: adminName?.trim() || 'College Admin',
+            firstName,
+            lastName,
+            email: adminEmail.trim().toLowerCase(),
+            password: hashedPassword,
+            role: 'COLLEGE_ADMIN',
+            isActive: true,
+            mustChangePassword: true,
+          }
+        }
+      }
     });
 
-    const adminUser = await User.create({
-      name: adminName?.trim() || 'College Admin',
-      email: adminEmail.trim().toLowerCase(),
-      password: adminPassword,
-      role: 'COLLEGE_ADMIN',
-      college: college._id,
-      mustChangePassword: true,
-    });
-
-    console.log('College and Admin created successfully:', college.name);
-
-    // Send Welcome Email - await is REQUIRED on Serverless (Vercel)
     try {
-      await sendWelcomeEmail(adminUser.email, adminPassword, college.name);
+      await sendWelcomeEmail(adminEmail.trim().toLowerCase(), adminPassword, college.name);
     } catch (e) {
-      console.error('Email sending failed during registration:', e.message);
+      console.error('Email sending failed:', e.message);
     }
 
     res.status(201).json({
       college,
-      adminId: adminUser._id,
-      emailSent: true, // We assume it's triggered
+      emailSent: true,
     });
+});
+
+module.exports = {
+  registerCollege,
+  getColleges,
+  getCollegeById,
+  getCollegeAdmin,
+  updateCollegeStatus,
+  deleteCollege,
+  extendSubscription,
+  changePlan,
+  cancelSubscription,
+  reactivateSubscription: asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    const college = await prisma.college.update({
+      where: { id: req.params.id },
+      data: { status: 'Active' }
+    });
+    res.json(college);
   }),
+  updatePaymentStatus: asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    const college = await prisma.college.findUnique({ where: { id: req.params.id } });
+    if (college) {
+        const subData = college.subscription || {};
+        subData.paymentStatus = status;
+        const updated = await prisma.college.update({
+            where: { id: req.params.id },
+            data: { subscription: subData }
+        });
+        res.json(updated);
+    } else {
+        res.status(404);
+        throw new Error('College not found');
+    }
+  }),
+  createCollegeWithAdmin,
+
   resendCredentials: asyncHandler(async (req, res) => {
     const { adminEmail, collegeCode } = req.body;
     
-    if (!adminEmail && !collegeCode) {
-      res.status(400);
-      throw new Error('adminEmail or collegeCode is required');
-    }
-
-    if (adminEmail && !validator.email(adminEmail)) {
-      res.status(400);
-      throw new Error('Invalid email format');
-    }
-
     let user;
-    
     if (adminEmail) {
-      user = await User.findOne({ email: adminEmail.toLowerCase(), role: 'COLLEGE_ADMIN' }).populate('college');
+      user = await prisma.user.findFirst({ 
+        where: { email: adminEmail.trim().toLowerCase(), role: 'COLLEGE_ADMIN' },
+        include: { college: true }
+      });
     } else if (collegeCode) {
-      const college = await College.findOne({ code: collegeCode.toUpperCase() });
-      if (college) {
-        user = await User.findOne({ college: college._id, role: 'COLLEGE_ADMIN' }).populate('college');
-      }
+      user = await prisma.user.findFirst({
+        where: { college: { code: collegeCode.toUpperCase() }, role: 'COLLEGE_ADMIN' },
+        include: { college: true }
+      });
     }
 
     if (!user) {
@@ -521,15 +508,20 @@ module.exports = {
     }
 
     const tempPassword = Math.random().toString(36).slice(-10) + 'A!';
-    user.password = tempPassword;
-    user.mustChangePassword = true;
-    await user.save();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        mustChangePassword: true
+      }
+    });
 
     try {
-      await sendWelcomeEmail(user.email, tempPassword, user.college ? user.college.name : collegeCode || 'Pulse College');
+      await sendWelcomeEmail(user.email, tempPassword, user.college?.name || 'Pulse College');
       res.json({ message: 'Credentials email sent' });
     } catch (e) {
-      console.error('Failed to send email normally:', e);
       res.json({ message: 'Credentials processed (fallback mode)' });
     }
   })

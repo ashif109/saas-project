@@ -89,11 +89,24 @@ model UserRole {
 
 model College {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  subdomain       String   @unique
+  name            String   @unique
+  code            String   @unique
+  subdomain       String?  @unique // Keep for legacy/future routing
   address         String?
+  city            String?
+  state           String?
+  country         String   @default("India")
+  email           String
+  phone           String?
+  website         String?
   logoUrl         String?
+  status          String   @default("Active") // Active, Disabled
   
+  subscription    Json?    // Stores { plan, status, paymentStatus, expiryDate, history: [] }
+  features        Json?    // Stores { doubtSystem, attendance, analytics }
+  limits          Json?    // Stores { students, faculty }
+  stats           Json?    // Stores { students, faculty }
+
   users           User[]   @relation("CollegeUsers")
   roles           Role[]   @relation("CollegeRoles")
   departments     Department[]
@@ -110,6 +123,38 @@ model College {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+model SystemSettings {
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentLimit            String   @default("5000")
+  facultyLimit            String   @default("250")
+  defaultPlan             String   @default("Basic")
+  autoApproval            Boolean  @default(false)
+  forcePasswordReset      Boolean  @default(true)
+  minPasswordLength       String   @default("10")
+  sessionTimeout          String   @default("60")
+  sendWelcomeEmail        Boolean  @default(true)
+  sendCredentials         Boolean  @default(true)
+  systemAlerts            Boolean  @default(true)
+  globalDoubtSystem       Boolean  @default(true)
+  globalAttendance        Boolean  @default(true)
+  globalAnalytics         Boolean  @default(true)
+  maxColleges             String   @default("50")
+  duplicateNameRestriction Boolean  @default(true)
+  approvalRequirement     Boolean  @default(true)
+  lowActivityThreshold    String   @default("15")
+  inactiveDaysAlert       String   @default("30")
+  autoBackup              Boolean  @default(true)
+  backupFrequency         String   @default("Daily")
+  lastBackup              String?
+  platformName            String   @default("PulseDesk")
+  themeColor              String   @default("#14b8a6")
+  logoUrl                 String   @default("")
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
 
 model Department {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
