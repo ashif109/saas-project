@@ -81,11 +81,11 @@ export default function FeesPage() {
         api.get('/api/students/list'),
         api.get('/api/setup/courses')
       ]);
-      setTransactions(txn.data);
-      setFeeStructures(str.data);
-      setStats(st.data);
-      setStudents(std.data);
-      setCourses(crs.data);
+      setTransactions(Array.isArray(txn.data) ? txn.data : (txn.data?.data || []));
+      setFeeStructures(Array.isArray(str.data) ? str.data : (str.data?.data || []));
+      setStats(st.data || { totalCollection: 0, pendingDues: 0, activeStudents: 0 });
+      setStudents(Array.isArray(std.data) ? std.data : (std.data?.data || []));
+      setCourses(Array.isArray(crs.data) ? crs.data : (crs.data?.data || []));
     } catch (err) {
       console.error(err);
       toast({ title: "Sync Error", description: "Failed to connect to financial ledger.", variant: "destructive" });
