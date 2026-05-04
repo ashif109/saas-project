@@ -1,12 +1,10 @@
-const asyncHandler = require('express-async-handler');
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const SystemSettings = require('../models/SystemSettings');
+const prisma = require('../config/prisma');
+const bcrypt = require('bcryptjs');
 const { sendPasswordResetOtp } = require('../services/emailService');
 const crypto = require('crypto');
 const { createLog } = require('./logController');
-const prisma = require('../config/prisma');
-const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const asyncHandler = require('express-async-handler');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -41,8 +39,8 @@ const login = asyncHandler(async (req, res) => {
 
   if (isMatch) {
     // Fetch Settings for token expiry
-    let settings = await SystemSettings.findOne();
-    if (!settings) settings = await SystemSettings.create({});
+    let settings = await prisma.systemSettings.findFirst();
+    if (!settings) settings = await prisma.systemSettings.create({ data: {} });
     const timeoutMinutes = parseInt(settings.sessionTimeout) || 60;
 
     await createLog({
@@ -135,8 +133,8 @@ const updateProfile = asyncHandler(async (req, res) => {
       }
 
       // Validate Password Length from Settings
-      let settings = await SystemSettings.findOne();
-      if (!settings) settings = await SystemSettings.create({});
+      let settings = await prisma.systemSettings.findFirst();
+      if (!settings) settings = await prisma.systemSettings.create({ data: {} });
       const minLength = parseInt(settings.minPasswordLength) || 8;
 
       if (req.body.password.length < minLength) {
@@ -330,8 +328,8 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 
   // Validate Password Length from Settings
-  let settings = await SystemSettings.findOne();
-  if (!settings) settings = await SystemSettings.create({});
+  let settings = await prisma.systemSettings.findFirst();
+  if (!settings) settings = await prisma.systemSettings.create({ data: {} });
   const minLength = parseInt(settings.minPasswordLength) || 8;
 
   if (password.length < minLength) {
