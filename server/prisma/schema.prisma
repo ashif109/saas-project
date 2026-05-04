@@ -23,6 +23,11 @@ model User {
   phone          String?
   isActive       Boolean   @default(true)
   
+  avatar         String?   @default("")
+  mustChangePassword Boolean? @default(false)
+  resetPasswordOTP     String?
+  resetPasswordExpires DateTime?
+
   // To handle multi-tenant isolation
   collegeId      String?   @map("college") @db.ObjectId
   college        College?  @relation("CollegeUsers", fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
