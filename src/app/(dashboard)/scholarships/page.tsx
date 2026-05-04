@@ -71,10 +71,18 @@ export default function ScholarshipsPage() {
         api.get('/api/scholarships'),
         api.get('/api/students/list')
       ]);
-      setScholarships(schRes.data);
-      setStudents(stdRes.data);
+      
+      // Handle potential object/paginated response
+      const schData = Array.isArray(schRes.data) ? schRes.data : schRes.data?.data || [];
+      const stdData = Array.isArray(stdRes.data) ? stdRes.data : stdRes.data?.data || [];
+      
+      setScholarships(schData);
+      setStudents(stdData);
     } catch (err) {
+      console.error('Fetch Error:', err);
       toast({ title: "Fetch Error", description: "Could not load scholarship data.", variant: "destructive" });
+      setScholarships([]);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -130,10 +138,14 @@ export default function ScholarshipsPage() {
     setAppsLoading(true);
     try {
       const res = await api.get(`/api/scholarships/${sch.id}/applications`);
-      setApplications(res.data);
+      const appData = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setApplications(appData);
     } catch (err) {
+      console.error('Fetch Apps Error:', err);
       toast({ title: "Error", description: "Failed to load candidates.", variant: "destructive" });
+      setApplications([]);
     } finally {
+      setAppsLoading(true); // Should be false, fixed below
       setAppsLoading(false);
     }
   };
@@ -144,8 +156,10 @@ export default function ScholarshipsPage() {
       toast({ title: "Status Updated", description: `Application ${status.toLowerCase()}.` });
       // Refresh applications list
       const res = await api.get(`/api/scholarships/${selectedScholarship.id}/applications`);
-      setApplications(res.data);
+      const appData = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setApplications(appData);
     } catch (err) {
+      console.error('Update App Error:', err);
       toast({ title: "Update Failed", variant: "destructive" });
     }
   };
@@ -207,7 +221,7 @@ export default function ScholarshipsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {scholarships.map((sch) => (
+            {Array.isArray(scholarships) && scholarships.map((sch) => (
               <Card key={sch.id} className="border-none shadow-xl shadow-slate-200/50 hover:scale-[1.02] transition-all rounded-3xl overflow-hidden group bg-white/80 backdrop-blur-sm">
                 <div className={`h-1.5 w-full ${sch.status === 'ACTIVE' ? 'bg-indigo-500' : 'bg-slate-300'}`} />
                 <CardHeader className="pb-4">
@@ -376,7 +390,7 @@ export default function ScholarshipsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {applications.map((app) => (
+                                {Array.isArray(applications) && applications.map((app) => (
                                     <TableRow key={app.id} className="border-slate-50 group">
                                         <TableCell className="py-4">
                                             <div className="flex items-center gap-3">
@@ -434,7 +448,7 @@ export default function ScholarshipsPage() {
                                     <SelectValue placeholder="Search Student..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {students.map(s => <SelectItem key={s._id} value={s._id}>{s.name} ({s.id})</SelectItem>)}
+                                    {Array.isArray(students) && students.map(s => <SelectItem key={s._id} value={s._id}>{s.name} ({s.id})</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
